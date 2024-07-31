@@ -1,3 +1,6 @@
+/* eslint-disable no-constant-condition */
+/* eslint-disable camelcase */
+
 /**
  * Import function triggers from their respective submodules:
  *
@@ -13,9 +16,12 @@ const {onDocumentCreated} = require("firebase-functions/v2/firestore");
 // The Firebase Admin SDK to access Firestore.
 const {initializeApp} = require("firebase-admin/app");
 const {getFirestore} = require("firebase-admin/firestore");
+const db = getFirestore();
 
 
 initializeApp();
+
+db.settings({ignoreUndefinedProperties: true});
 
 
 exports.matchingFunction = onDocumentCreated("users/{userId}/trips/{tripId}",
@@ -29,70 +35,183 @@ exports.matchingFunction = onDocumentCreated("users/{userId}/trips/{tripId}",
           return;
         }
         const newTripData = snapshot.data();
-        const matchingTrips = [];
-        const pickupMatchingTrips = [];
-        const destinationMatchingTrips = [];
-        const finalPickupTrips = [];
-        const finalTrips = [];
-        const poolRef = getFirestore().collection("pools");
+        console.log(newTripData);
+        console.log(typeof newTripData.start_date_time);
+        const firstStageTrips = [];
+        let secondStageTrips = [];
+        let thirdStageTrips = [];
+        const fourthStageTrips = [];
+        const finalStageTrips = [];
+
+        const matchedTrips = [];
+        const newMatchedTripData = [];
+        // const poolRef = db.collection("pools");
         const apiKey = process.env.API_KEY;
         const distanceMatrixApiKey = process.env.DISTANCE_MATRIX_API_KEY;
 
         const matchCheck = async (list) => {
           if (list.length > 0) {
-            const userTripDocRef = getFirestore()
+            const userTripDocRef = db
                 .collection(`users/${userId}/trips`).doc(tripId);
             await userTripDocRef.update({status: "matched"});
 
             return "matched";
           } else {
-            const userTripDocRef = getFirestore()
+            const userTripDocRef = db
                 .collection(`users/${userId}/trips`).doc(tripId);
             await userTripDocRef.update({status: "unmatched"});
-            throw new Error("Trip could not be matched");
+            return "no";
           }
         };
 
+        const isProperMatch = (matchedtrip, newTripData) => {
+          return (
+            newTripData.pickup_radius + matchedtrip.pickup_radius <=
+            matchedtrip.pickup_distance &&
+            // eslint-disable-next-line max-len
+            newTripData.destination_radius + matchedtrip.destination_radius <= matchedtrip.destination_distance
+          );
+        };
+
+        // const isFullyMatched = (newTripMatches, oldTripGroup) => {
+        //   const newTripMatchIds = newTripMatches.map((trip) => trip.trip_id);
+        //   const oldTripGroupIds = oldTripGroup.map((trip) => trip.trip_id);
+        //   return newTripMatchIds.length ===
+        //   oldTripGroupIds.length && newTripMatchIds
+        //       .every((value) => oldTripGroupIds.includes(value));
+        // };
+
         try {
           // Retrieve all users
-          const usersSnapshot = await getFirestore().collection("users").get();
+          const usersSnapshot = await db.collection("users").get();
 
           const userTripPromises = usersSnapshot.docs.map(async (userDoc) => {
             const otherUserId = userDoc.id;
 
             if (otherUserId !== userId) {
-              const filteredTripsSnapshot = await getFirestore()
-                  .collection(`users/${otherUserId}/trips`)
-                  .where("pickup_city", "==", newTripData.pickup_city)
-                  .where("destination_city", "==", newTripData.destination_city)
-                  .where(newTripData.start_date_time, "<=", "start_date_time",
-                      "<=", newTripData.end_date_time ||
-                      newTripData.start_date_time, "<=", "end_date_time",
-                      "<=", newTripData.end_date_time ||
-                      "start_date_time", "<=", newTripData.start_date_time,
-                      "<=", "end_date_time" ||
-                      "start_date_time", "<=", newTripData.end_date_time,
-                      "<=", "end_date_time" ||
-                      "start_date_time", "===", newTripData.start_date_time)
-                  .where("fully_matched", "==", "false")
-                  .get();
+              const tripsRef = db
+                  .collection(`users/${otherUserId}/trips`);
+              const queries = [];
+
+              if (newTripData.isTripTimeFixed === false) {
+                queries.push(tripsRef
+                    .where("pickup_city", "==", newTripData.pickup_city)
+                    .where("destination_city", "==",
+                        newTripData.destination_city)
+                    .where("isTripTimeFixed", "==", false)
+                    .where("time_range_array", "array-contains-any",
+                        newTripData.time_range_array)
+                    .where("fully_matched", "==", false));
+              }
+
+              if (newTripData.isTripTimeFixed === true) {
+                queries.push(tripsRef
+                    .where("pickup_city", "==", newTripData.pickup_city)
+                    .where("destination_city", "==",
+                        newTripData.destination_city)
+                    .where("isTripTimeFixed", "==", false)
+                    .where("time_range_array", "array-contains",
+                        newTripData.start_date_string)
+                    .where("fully_matched", "==", false));
+              }
+
+              if (newTripData.isTripTimeFixed === false) {
+                queries.push(tripsRef
+                    .where("pickup_city", "==", newTripData.pickup_city)
+                    .where("destination_city", "==",
+                        newTripData.destination_city)
+                    .where("isTripTimeFixed", "==", true)
+                    .where("start_date_string", "in",
+                        newTripData.time_range_array)
+                    .where("fully_matched", "==", false));
+              }
+
+              if (newTripData.isTripTimeFixed === true) {
+                queries.push(tripsRef
+                    .where("pickup_city", "==", newTripData.pickup_city)
+                    .where("destination_city", "==",
+                        newTripData.destination_city)
+                    .where("isTripTimeFixed", "==", true)
+                    .where("start_date_string", "==",
+                        newTripData.start_date_string)
+                    .where("fully_matched", "==", false));
+              }
+              // Execute the queries
+              const snapshots = await Promise
+                  .all(queries.map((query) => query.get()));
+
+              // Merge the results
+              const filteredTripsSnapshot = snapshots
+                  .flatMap((snapshot) => snapshot.docs);
 
               filteredTripsSnapshot.forEach((doc) => {
                 const oldTripData = doc.data();
-                matchingTrips.push(oldTripData);
+                firstStageTrips.push(oldTripData);
               });
             }
           });
           await Promise.all(userTripPromises);
+          if (await (matchCheck(firstStageTrips)) == "no") {
+            throw new Error("Empty Array Returned");
+          } else console.log("First stage of matched trips:", firstStageTrips);
         } catch (error) {
           console.error("Error fetching users or trips:", error);
+          // eslint-disable-next-line max-len
+          throw new Error("Trip could not match at the first stage (City and Time Filter)");
         }
 
-        matchCheck(matchingTrips);
+        const requests = firstStageTrips.map((trip) => {
+          const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${trip.pickup_description}&strictbounds=True&location=${newTripData.pickup_latlng.latitude},${newTripData.pickup_latlng.longitude}&radius=${newTripData.pickup_radius*2}&key=${apiKey}`;
+          return fetch(url)
+              .then((response) => {
+                if (!response.ok) {
+                  throw new Error("Network response was not ok");
+                }
+                return response.json();
+              })
+              .then((data) => {
+                if (!data) {
+                  console.log("No data gotten");
+                }
 
+                return {trip, data};
+              })
+              .catch((error) => {
+                console.error("There was a problem with the request:", error);
+              });
+        });
+        try {
+          const results = await Promise.all(requests);
+          const filteredTrips = results.filter((result) => {
+            const data = result.data;
+            if (data.status === "OK" && data.predictions.length > 0) {
+              // Check if any place description matches the innput parameter
+              const descriptions = data.predictions
+                  .map((prediction) => prediction.description);
+              return descriptions.some((description) => {
+                return description.toLowerCase()
+                    .includes(result.trip.pickup_description.toLowerCase());
+              });
+            }
+            // If no predictions or status is not "OK", exclude this trip
+            return false;
+          });
+          secondStageTrips = filteredTrips
+              .map((filtered) => filtered.trip);
+          if (await (matchCheck(secondStageTrips)) == "no") {
+            throw new Error("Empty array returned on second stage");
+          } else {
+            console.log("Second Stage of matched Trips (Pickups):",
+                secondStageTrips);
+          }
+        } catch (error) {
+          console.error("Error in processing requests:", error);
+          // eslint-disable-next-line max-len
+          throw new Error("Trip could not match at the second stage (Place AutoComplete with Pickup)");
+        }
 
-        const requests = matchingTrips.map((trip) => {
-          const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${trip.pickup_description}&strictbounds=True&location=${newTripData.pickup_latlng}&radius=${newTripData.pickup_radius*2}&key=${apiKey}`;
+        const destinationRequests = secondStageTrips.map((trip) => {
+          const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${trip.destination_description}&strictbounds=True&location=${newTripData.destination_latlng.latitude},${newTripData.destination_latlng.longitude}&radius=${newTripData.destination_radius*2}&key=${apiKey}`;
           return fetch(url)
               .then((response) => {
                 if (!response.ok) {
@@ -107,89 +226,45 @@ exports.matchingFunction = onDocumentCreated("users/{userId}/trips/{tripId}",
                 console.error("There was a problem with the request:", error);
               });
         });
-        Promise.all(requests)
-            .then((results) => {
-              const filteredTrips = results.filter((result) => {
-                const data = result.data;
-                if (data.status === "OK" && data.predictions.length > 0) {
-                  // Check if any place description matches the input parameter
-                  const descriptions = data.predictions
-                      .map((prediction) => prediction.description);
-                  return descriptions.some((description) => {
-                    return description.toLowerCase()
-                        .includes(result.trip.pickup_description.toLowerCase());
-                  });
-                }
-                // If no predictions or status is not "OK", exclude this trip
-                return false;
+        try {
+          const results = await Promise.all(destinationRequests);
+          const filteredTrips = results.filter((result) => {
+            const data = result.data;
+            if (data.status === "OK" && data.predictions.length > 0) {
+              // Check if any place description matches the input parameter
+              const descriptions = data.predictions
+                  .map((prediction) => prediction.description);
+              return descriptions.some((description) => {
+                return description.toLowerCase()
+                    .includes(result.trip.destination_description
+                        .toLowerCase());
               });
-              const tripList = filteredTrips
-                  .map((filtered) => filtered.trip);
-              pickupMatchingTrips.push(tripList);
-              console.log("Updated Matching Trips from Pickups:",
-                  pickupMatchingTrips);
-            })
-            .catch((error) => {
-              console.error("Error in processing requests:", error);
-              return null;
-            });
-
-        matchCheck(pickupMatchingTrips);
-
-        const destinationRequests = pickupMatchingTrips.map((trip) => {
-          const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${trip.destination_description}&strictbounds=True&location=${newTripData.destination_latlng}&radius=${newTripData.destination_radius*2}&key=${apiKey}`;
-          return fetch(url)
-              .then((response) => {
-                if (!response.ok) {
-                  throw new Error("Network response was not ok");
-                }
-                return response.json();
-              })
-              .then((data) => {
-                return {trip, data};
-              })
-              .catch((error) => {
-                console.error("There was a problem with the request:", error);
-              });
-        });
-        Promise.all(destinationRequests)
-            .then((results) => {
-              const filteredTrips = results.filter((result) => {
-                const data = result.data;
-                if (data.status === "OK" && data.predictions.length > 0) {
-                  // Check if any place description matches the input parameter
-                  const descriptions = data.predictions
-                      .map((prediction) => prediction.description);
-                  return descriptions.some((description) => {
-                    return description.toLowerCase()
-                        .includes(result.trip.destination_description
-                            .toLowerCase());
-                  });
-                }
-                // If no predictions or status is not "OK", exclude this trip
-                return false;
-              });
-              const tripList = filteredTrips
-                  .map((filtered) => filtered.trip);
-              destinationMatchingTrips.push(tripList);
-              console.log("Updated Matching Trips from destinations:",
-                  destinationMatchingTrips);
-            })
-            .catch((error) => {
-              console.error("Error in processing requests:", error);
-              return null;
-            });
-
-        matchCheck(destinationMatchingTrips);
+            }
+            // If no predictions or status is not "OK", exclude this trip
+            return false;
+          });
+          thirdStageTrips = filteredTrips
+              .map((filtered) => filtered.trip);
+          if (await (matchCheck(thirdStageTrips)) == "no") {
+            throw new Error("Empty array returned on third stage");
+          } else {
+            console.log("Third stage of Matched Trips (destinations):",
+                thirdStageTrips);
+          }
+        } catch (error) {
+          console.error("Error in processing requests:", error);
+          // eslint-disable-next-line max-len
+          throw new Error("Trip could not match at the third stage (Place AutoComplete with Destination)");
+        }
 
         const distanceMatrixApiUrl = "https://api.distancematrix.ai/maps/api/distancematrix/json";
 
         const origins = newTripData.pickup_description;
-        const destinations = destinationMatchingTrips
+        const destinations = thirdStageTrips
             .map((trip) => trip.pickup_description).join("|");
 
-        const distanceMatrixUrl = `${distanceMatrixApiUrl}?origins=${origins}
-        &destinations=${destinations}&key=${distanceMatrixApiKey}`;
+        // eslint-disable-next-line max-len
+        const distanceMatrixUrl = `${distanceMatrixApiUrl}?origins=${origins}&destinations=${destinations}&key=${distanceMatrixApiKey}`;
 
         try {
           const distanceMatrixResponse = await fetch(distanceMatrixUrl);
@@ -201,30 +276,43 @@ exports.matchingFunction = onDocumentCreated("users/{userId}/trips/{tripId}",
             const rows = distanceMatrixData.rows;
             if (rows.length > 0 && rows[0].elements.length > 0) {
               rows[0].elements.forEach((element, index) => {
-                const distanceValue = element.distance.value;
-                if (distanceValue <= newTripData.pickup_radius*2) {
-                  finalPickupTrips
-                      .push(destinationMatchingTrips[index]);
+                if (element.distance && element.distance.value !== undefined) {
+                  const distanceValue = element.distance.value;
+                  if (distanceValue <= newTripData.pickup_radius*2) {
+                    const tripToAdd = thirdStageTrips[index];
+                    tripToAdd.pickup_distance = distanceValue;
+                    fourthStageTrips
+                        .push(tripToAdd);
+                  }
+                } else {
+                  // eslint-disable-next-line max-len
+                  console.log("Distance value is undefined for this trip:", thirdStageTrips[index]);
+                  const tripToAdd = thirdStageTrips[index];
+                  tripToAdd.pickup_distance = 0;
+                  fourthStageTrips.push(tripToAdd);
                 }
               });
             }
           }
-          console.log("New Matching Trips within radius from pickups:",
-              finalPickupTrips);
+          if (await (matchCheck(fourthStageTrips)) == "yes") {
+            throw new Error("Empty Array returned at fouth stage");
+          } else {
+            console.log("Fourth stage of Matched Trips (pickups):",
+                fourthStageTrips);
+          }
         } catch (error) {
           console.error("Error fetching distance matrix:", error);
-          return null;
+          // eslint-disable-next-line max-len
+          throw new Error("Trip could not match at the fourth stage (Distance Matrix with Pickup)");
         }
 
-        matchCheck(finalPickupTrips);
 
         const finalOrigins = newTripData.destination_description;
-        const finalDestinations = finalPickupTrips
+        const finalDestinations = fourthStageTrips
             .map((trip) => trip.destination_description).join("|");
 
-        const finalDistanceMatrixUrl = `${distanceMatrixApiUrl}
-        ?origins=${finalOrigins}
-        &destinations=${finalDestinations}&key=${distanceMatrixApiKey}`;
+        // eslint-disable-next-line max-len
+        const finalDistanceMatrixUrl = `${distanceMatrixApiUrl}?origins=${finalOrigins}&destinations=${finalDestinations}&key=${distanceMatrixApiKey}`;
 
         try {
           const distanceMatrixResponse = await fetch(finalDistanceMatrixUrl);
@@ -236,48 +324,259 @@ exports.matchingFunction = onDocumentCreated("users/{userId}/trips/{tripId}",
             const rows = distanceMatrixData.rows;
             if (rows.length > 0 && rows[0].elements.length > 0) {
               rows[0].elements.forEach((element, index) => {
-                const distanceValue = element.distance.value;
-                if (distanceValue <= newTripData.destination_radius*2) {
-                  finalTrips
-                      .push(finalPickupTrips[index]);
+                if (element.distance && element.distance.value !== undefined) {
+                  const distanceValue = element.distance.value;
+                  if (distanceValue <= newTripData.destination_radius*2) {
+                    const tripToAdd = fourthStageTrips[index];
+                    tripToAdd.destination_distance = distanceValue;
+                    tripToAdd.reserved = false;
+                    finalStageTrips
+                        .push(tripToAdd);
+                  }
+                } else {
+                  // eslint-disable-next-line max-len
+                  console.log("Distance value is undefined for this trip:", thirdStageTrips[index]);
+                  const tripToAdd = fourthStageTrips[index];
+                  tripToAdd.destination_distance = 0;
+                  tripToAdd.reserved = false;
+                  finalStageTrips.push(tripToAdd);
                 }
               });
             }
           }
-          console.log("New Matching Trips within radius from destinations:",
-              finalTrips);
+          if (await (matchCheck(finalStageTrips)) == "no") {
+            throw new Error("Empty array returned at fifth stage");
+          } else {
+            matchedTrips
+                .push(finalStageTrips
+                    .map(({trip_id, pickup_radius, destination_radius,
+                      pickup_distance, destination_distance}) => ({
+                      trip_id,
+                      pickup_radius,
+                      destination_radius,
+                      pickup_distance,
+                      destination_distance,
+                    })));
+            const {trip_id, pickup_radius, destination_radius} = newTripData;
+            newMatchedTripData.push(
+                matchedTrips.map(({pickup_distance, destination_distance}) => ({
+                  trip_id,
+                  pickup_radius,
+                  destination_radius,
+                  pickup_distance,
+                  destination_distance,
+                  reserved: false,
+                })));
+
+            console.log("Fifth stage of Matched Trips (destinations):",
+                finalStageTrips);
+          }
         } catch (error) {
           console.error("Error fetching distance matrix:", error);
-          return null;
+          // eslint-disable-next-line max-len
+          throw new Error("Trip could not match at the fifth stage (Distance Matrix with Destination)");
         }
 
-        matchCheck(finalTrips);
+        // const processTrips = async () => {
+        //   const processPromises = finalStageTrips.map(async (trip) => {
+        //     const poolQuery = await poolRef
+        //         .where("trips", "array-contains", trip).get();
+        //     if (!poolQuery.empty) {
+        //       // Trip found in a pool, update existing pools
+        //       const updatePoolPromises = poolQuery.docs
+        //           .map(async (docSnapshot) => {
+        //             const docData = docSnapshot.data();
+        //             const existingTrips = docData.trips;
+        //             // eslint-disable-next-line max-len
+        //             if (existingTrips.every((trip) => finalStageTrips
+        //                .includes(trip))) {
+        //               const newTrips = [...existingTrips, newTripData];
+        //               await docSnapshot.ref.update({trips: newTrips});
+        //             } else {
+        //               await poolRef.add({
+        //                 trips: [trip, tripId],
+        //               });
+        //             }
+        //           });
+        //       await Promise.all(updatePoolPromises);
+        //     } else {
+        //       // Trip not found in any pool, create new pool
+        //       await poolRef.add({
+        //         trips: [trip.uid, newTripData],
+        //       });
+        //     }
+        //   });
+        //   await Promise.all(processPromises);
+        // };
+        // await processTrips();
 
-        const processTrips = async () => {
-          const processPromises = finalTrips.map(async (trip) => {
-            const poolQuery = await poolRef
-                .where("trips", "array-contains", trip).get();
-            if (!poolQuery.empty) {
-              // Trip found in a pool, update existing pools
-              const updatePoolPromises = poolQuery.docs
-                  .map(async (docSnapshot) => {
-                    const docData = docSnapshot.data();
-                    const existingTrips = docData.trips;
-                    const newTrips = [...existingTrips, newTripData]
-                        .filter((trip) => finalTrips.includes(trip));
-                    await docSnapshot.ref.update({trips: newTrips});
-                  });
-              await Promise.all(updatePoolPromises);
+        for (let i = 0; i < finalStageTrips.length; i++) {
+          const currentTrip = finalStageTrips[i];
+          const oldTripGroup = {};
+
+          // Check if trip_status is matched or unmatched
+          if (currentTrip.trip_status === "matched" ||
+            currentTrip.trip_status === "unmatched") {
+            const result = isProperMatch(currentTrip, newTripData);
+            if (result == true && currentTrip.reserved == false) {
+              if (currentTrip.trip_status == "unmatched" ||
+              currentTrip.trip_status == "matched");
+              {
+                currentTrip.trip_status = "matched";
+                const userTripDocRef = db
+                    .collection(`users/${userId}/trips`).doc(tripId);
+                currentTrip.trip_status = "unmatched" ? await userTripDocRef
+                    .update({matched_trips: db.FieldValue
+                        .arrayUnion({...matchedTrips[i], paid: false,
+                          priority: true, mutual: true})}) :
+                    await userTripDocRef
+                        .update({matched_trips: db.FieldValue
+                            .arrayUnion({...matchedTrips[i], paid: false,
+                              priority: false, mutual: true})});
+                const tripRef = db
+                    .collectionGroup("trips")
+                    .doc(currentTrip.trip_id);
+                tripRef.get().then(async (doc) => {
+                  if (doc.exists) {
+                    const userRef = doc.ref.parent.parent;
+                    const userId = userRef.id;
+                    const userTripDocRef = db
+                        .collection(`users/${userId}/trips`)
+                        .doc(currentTrip.trip_id);
+                    await userTripDocRef
+                        .update({matched_trips: db.FieldValue
+                            .arrayUnion({...newMatchedTripData[i], paid: false,
+                              mutual: true})});
+                  } else {
+                    console.log("No such document!");
+                  }
+                }).catch((error) => {
+                  console.log("Error getting document:", error);
+                });
+              }
             } else {
-              // Trip not found in any pool, create new pool
-              await poolRef.add({
-                trips: [trip, newTripData],
-              });
+              if (result == true) {
+                const userTripDocRef = db
+                    .collection(`users/${userId}/trips`).doc(tripId);
+                await userTripDocRef
+                    .update({potential_trips: db.FieldValue
+                        .arrayUnion({...matchedTrips[i],
+                          paid: false, proper_match: true, reserved: true,
+                          trip_obstruction: false, seat_obstruction: false,
+                          mutual: false})});
+                const tripRef = db
+                    .collectionGroup("trips").doc(currentTrip.trip_id);
+                tripRef.get().then(async (doc) => {
+                  if (doc.exists) {
+                    const userRef = doc.ref.parent.parent;
+                    const userId = userRef.id;
+                    const userTripDocRef = db
+                        .collection(`users/${userId}/trips`)
+                        .doc(currentTrip.trip_id);
+                    await userTripDocRef
+                        .update({potential_trips: db.FieldValue
+                            .arrayUnion({...newMatchedTripData[i],
+                              paid: false, mutual: false})});
+                  } else {
+                    console.log("No such document!");
+                  }
+                }).catch((error) => {
+                  console.log("Error getting document:", error);
+                });
+              } else {
+                if (currentTrip.reserved == "true") {
+                  const userTripDocRef = db
+                      .collection(`users/${userId}/trips`).doc(tripId);
+                  await userTripDocRef
+                      .update({potential_trips: db.FieldValue
+                          .arrayUnion({...matchedTrips[i],
+                            paid: false, proper_match: false, reserved: true,
+                            trip_obstruction: false, seat_obstruction: false,
+                            mutual: true})});
+                  const tripRef = db
+                      .collectionGroup("trips").doc(currentTrip.trip_id);
+                  tripRef.get().then(async (doc) => {
+                    if (doc.exists) {
+                      const userRef = doc.ref.parent.parent;
+                      const userId = userRef.id;
+                      const userTripDocRef = db
+                          .collection(`users/${userId}/trips`)
+                          .doc(currentTrip.trip_id);
+                      await userTripDocRef
+                          .update({potential_trips: db.FieldValue
+                              .arrayUnion({...newMatchedTripData[i],
+                                paid: false, proper_match: false,
+                                reserved: false,
+                                trip_obstruction: false,
+                                seat_obstruction: false,
+                                mutual: true})});
+                    } else {
+                      console.log("No such document!");
+                    }
+                  }).catch((error) => {
+                    console.log("Error getting document:", error);
+                  });
+                } else {
+                  const userTripDocRef = db
+                      .collection(`users/${userId}/trips`).doc(tripId);
+                  await userTripDocRef
+                      .update({potential_trips: db.FieldValue
+                          .arrayUnion({...matchedTrips[i],
+                            paid: false, proper_match: false,
+                            reserved: false,
+                            trip_obstruction: false,
+                            seat_obstruction: false,
+                            mutual: true})});
+                  const tripRef = db
+                      .collectionGroup("trips").doc(currentTrip.trip_id);
+                  tripRef.get().then(async (doc) => {
+                    if (doc.exists) {
+                      const userRef = doc.ref.parent.parent;
+                      const userId = userRef.id;
+                      const userTripDocRef = db
+                          .collection(`users/${userId}/trips`)
+                          .doc(currentTrip.trip_id);
+                      await userTripDocRef
+                          .update({potential_trips: db.FieldValue
+                              .arrayUnion({...newMatchedTripData[i],
+                                paid: false, proper_match: false,
+                                reserved: false,
+                                trip_obstruction: false,
+                                seat_obstruction: false,
+                                mutual: true})});
+                    } else {
+                      console.log("No such document!");
+                    }
+                  }).catch((error) => {
+                    console.log("Error getting document:", error);
+                  });
+                }
+              }
             }
-          });
-          await Promise.all(processPromises);
-        };
-        await processTrips();
+          } else if (currentTrip.trip_status === "paid") {
+            if (isProperMatch(currentTrip, newTripData) &&
+            oldTripGroup.trip_group_members.every((member) => {
+              const matchedTrip = newTripData.matchedTrips
+                  .find((trip) => trip.trip_id === member.trip_id);
+              return matchedTrip && isProperMatch(newTripData, matchedTrip);
+            }) &&
+                  oldTripGroup.total_seat_count == 4 &&
+                  oldTripGroup.total_seat_count >= newTripData.seat_count) {
+              if (oldTripGroup.potential_trips
+                  .some((potential) => potential.trip_id ===
+                  newTripData.trip_id)) {
+                    
+              }
+              oldTripGroup.matched_trips.push(newTripData.trip_id);
+              const userTripDocRef = db
+                  .collection(`users/${userId}/trips`).doc(tripId);
+              await userTripDocRef
+                  .update({matched_trips: db.FieldValue
+                      .arrayUnion({...matchedTrips[i], paid: true,
+                        trip_group_id: oldTripGroup.trip_group_id})});
+            }
+          }
+        }
 
         console.log("Matching complete"); // Return a promise or null when done
         return "Matching complete";
