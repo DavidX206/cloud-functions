@@ -1,6 +1,6 @@
 
 const admin = require("firebase-admin");
-const serviceAccount = process.env.SERVICE_ACCOUNT;
+const serviceAccount = require("./service-account/starlit-cycle-403120-firebase-adminsdk-j65vo-630de9d3ae.json");
 const users = require("./mock/users.json");
 const trips = require("./mock/trips.json");
 
