@@ -1,0 +1,1109 @@
+[
+  {
+    "trip_id": "trip_001",
+    "trip_group_id": "",
+    "user_id": "uid1",
+    "pickup_description": "Nigerian Customs Service Headquarters",
+    "pickup_short_description": "Customs HQ",
+    "pickup_latlng": {
+      "lat": 9.0406,
+      "lng": 7.4863
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 3425,
+    "destination_description": "Nigerian Communications Commission (NCC)",
+    "destination_short_description": "NCC",
+    "destination_latlng": {
+      "lat": 9.0532,
+      "lng": 7.4781
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 4521,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T18:30:00",
+    "start_date_string": "06:30PM",
+    "end_date_time": null,
+    "end_date_string": null,
+    "time_range_array": null,
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": true,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626084"
+  },
+  {
+    "trip_id": "trip_002",
+    "trip_group_id": "",
+    "user_id": "uid2",
+    "pickup_description": "Transcorp Hilton Hotel",
+    "pickup_short_description": "Transcorp Hilton",
+    "pickup_latlng": {
+      "lat": 9.0736,
+      "lng": 7.4937
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 917,
+    "destination_description": "Silverbird Entertainment Centre",
+    "destination_short_description": "Silverbird Centre",
+    "destination_latlng": {
+      "lat": 9.0495,
+      "lng": 7.4893
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 4017,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "07:00PM",
+    "end_date_time": "2024-12-21T19:46:00",
+    "end_date_string": "07:46PM",
+    "time_range_array": [
+      "2024-12-21T19:00:00",
+      "2024-12-21T19:46:00"
+    ],
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626170"
+  },
+  {
+    "trip_id": "trip_003",
+    "trip_group_id": "",
+    "user_id": "uid3",
+    "pickup_description": "African University of Science and Technology",
+    "pickup_short_description": "AUST",
+    "pickup_latlng": {
+      "lat": 9.0445,
+      "lng": 7.4517
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 3666,
+    "destination_description": "EFCC Headquarters",
+    "destination_short_description": "EFCC HQ",
+    "destination_latlng": {
+      "lat": 9.0523,
+      "lng": 7.4409
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 3222,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T18:30:00",
+    "start_date_string": "06:30PM",
+    "end_date_time": "2024-12-21T19:14:00",
+    "end_date_string": "07:14PM",
+    "time_range_array": [
+      "2024-12-21T18:30:00",
+      "2024-12-21T19:14:00"
+    ],
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626242"
+  },
+  {
+    "trip_id": "trip_004",
+    "trip_group_id": "",
+    "user_id": "uid4",
+    "pickup_description": "Mabushi Ultramodern Market",
+    "pickup_short_description": "Mabushi Market",
+    "pickup_latlng": {
+      "lat": 9.0661,
+      "lng": 7.4458
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 3867,
+    "destination_description": "Gudu Cemetery",
+    "destination_short_description": "Gudu Cemetery",
+    "destination_latlng": {
+      "lat": 9.0201,
+      "lng": 7.5143
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 4622,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T17:00:00",
+    "start_date_string": "05:00PM",
+    "end_date_time": "2024-12-21T17:49:00",
+    "end_date_string": "05:49PM",
+    "time_range_array": [
+      "2024-12-21T17:00:00",
+      "2024-12-21T17:49:00"
+    ],
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626303"
+  },
+  {
+    "trip_id": "trip_005",
+    "trip_group_id": "",
+    "user_id": "uid5",
+    "pickup_description": "ICPC Headquarters",
+    "pickup_short_description": "ICPC HQ",
+    "pickup_latlng": {
+      "lat": 9.0704,
+      "lng": 7.4791
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 3217,
+    "destination_description": "Ministers\u2019 Hill",
+    "destination_short_description": "Ministers\u2019 Hill",
+    "destination_latlng": {
+      "lat": 9.0748,
+      "lng": 7.4811
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 4258,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T17:30:00",
+    "start_date_string": "05:30PM",
+    "end_date_time": "2024-12-21T18:00:00",
+    "end_date_string": "06:00PM",
+    "time_range_array": [
+      "2024-12-21T17:30:00",
+      "2024-12-21T18:00:00"
+    ],
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626362"
+  },
+  {
+    "trip_id": "trip_006",
+    "trip_group_id": "",
+    "user_id": "uid6",
+    "pickup_description": "Zuma Rock",
+    "pickup_short_description": "Zuma Rock",
+    "pickup_latlng": {
+      "lat": 9.1202,
+      "lng": 7.2146
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 1463,
+    "destination_description": "Asokoro District Hospital",
+    "destination_short_description": "Asokoro Hospital",
+    "destination_latlng": {
+      "lat": 9.0439,
+      "lng": 7.5213
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 1273,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T19:30:00",
+    "start_date_string": "07:30PM",
+    "end_date_time": "2024-12-21T20:05:00",
+    "end_date_string": "08:05PM",
+    "time_range_array": [
+      "2024-12-21T19:30:00",
+      "2024-12-21T20:05:00"
+    ],
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626418"
+  },
+  {
+    "trip_id": "trip_007",
+    "trip_group_id": "",
+    "user_id": "uid7",
+    "pickup_description": "Nigerian Communications Commission (NCC)",
+    "pickup_short_description": "NCC",
+    "pickup_latlng": {
+      "lat": 9.0532,
+      "lng": 7.4781
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 3197,
+    "destination_description": "Dunamis International Gospel Centre (Glory Dome)",
+    "destination_short_description": "Glory Dome",
+    "destination_latlng": {
+      "lat": 8.9934,
+      "lng": 7.5507
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 725,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T18:30:00",
+    "start_date_string": "06:30PM",
+    "end_date_time": null,
+    "end_date_string": null,
+    "time_range_array": null,
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": true,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626460"
+  },
+  {
+    "trip_id": "trip_008",
+    "trip_group_id": "",
+    "user_id": "uid8",
+    "pickup_description": "Jabi Recreational Park",
+    "pickup_short_description": "Jabi Park",
+    "pickup_latlng": {
+      "lat": 9.0652,
+      "lng": 7.4257
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 3035,
+    "destination_description": "Silverbird Entertainment Centre",
+    "destination_short_description": "Silverbird Centre",
+    "destination_latlng": {
+      "lat": 9.0495,
+      "lng": 7.4893
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 3414,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T18:00:00",
+    "start_date_string": "06:00PM",
+    "end_date_time": null,
+    "end_date_string": null,
+    "time_range_array": null,
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": true,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626536"
+  },
+  {
+    "trip_id": "trip_009",
+    "trip_group_id": "",
+    "user_id": "uid9",
+    "pickup_description": "Ibrahim Babangida Way",
+    "pickup_short_description": "IBB Way",
+    "pickup_latlng": {
+      "lat": 9.0541,
+      "lng": 7.4887
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 2574,
+    "destination_description": "ICPC Headquarters",
+    "destination_short_description": "ICPC HQ",
+    "destination_latlng": {
+      "lat": 9.0704,
+      "lng": 7.4791
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 4206,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T17:30:00",
+    "start_date_string": "05:30PM",
+    "end_date_time": "2024-12-21T18:01:00",
+    "end_date_string": "06:01PM",
+    "time_range_array": [
+      "2024-12-21T17:30:00",
+      "2024-12-21T18:01:00"
+    ],
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626600"
+  },
+  {
+    "trip_id": "trip_010",
+    "trip_group_id": "",
+    "user_id": "uid10",
+    "pickup_description": "Gwagwalada Specialist Hospital",
+    "pickup_short_description": "Gwagwalada Hospital",
+    "pickup_latlng": {
+      "lat": 8.94,
+      "lng": 7.079
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 3170,
+    "destination_description": "Silverbird Entertainment Centre",
+    "destination_short_description": "Silverbird Centre",
+    "destination_latlng": {
+      "lat": 9.0495,
+      "lng": 7.4893
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 2459,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T18:30:00",
+    "start_date_string": "06:30PM",
+    "end_date_time": null,
+    "end_date_string": null,
+    "time_range_array": null,
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": true,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626640"
+  },
+  {
+    "trip_id": "trip_011",
+    "trip_group_id": "",
+    "user_id": "uid11",
+    "pickup_description": "Abuja Stadium (Moshood Abiola National Stadium)",
+    "pickup_short_description": "Abuja Stadium",
+    "pickup_latlng": {
+      "lat": 9.0138,
+      "lng": 7.4481
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 619,
+    "destination_description": "Jabi Motor Park",
+    "destination_short_description": "Jabi Motor Park",
+    "destination_latlng": {
+      "lat": 9.0725,
+      "lng": 7.4172
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 3676,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "07:00PM",
+    "end_date_time": null,
+    "end_date_string": null,
+    "time_range_array": null,
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": true,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626678"
+  },
+  {
+    "trip_id": "trip_012",
+    "trip_group_id": "",
+    "user_id": "uid12",
+    "pickup_description": "Central Bank of Nigeria (CBN) Headquarters",
+    "pickup_short_description": "CBN Headquarters",
+    "pickup_latlng": {
+      "lat": 9.0423,
+      "lng": 7.49
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 2560,
+    "destination_description": "Maitama Amusement Park",
+    "destination_short_description": "Maitama Park",
+    "destination_latlng": {
+      "lat": 9.0843,
+      "lng": 7.4841
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 4910,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T18:30:00",
+    "start_date_string": "06:30PM",
+    "end_date_time": null,
+    "end_date_string": null,
+    "time_range_array": null,
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": true,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626715"
+  },
+  {
+    "trip_id": "trip_013",
+    "trip_group_id": "",
+    "user_id": "uid13",
+    "pickup_description": "Jabi Motor Park",
+    "pickup_short_description": "Jabi Motor Park",
+    "pickup_latlng": {
+      "lat": 9.0725,
+      "lng": 7.4172
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 4806,
+    "destination_description": "Jabi Recreational Park",
+    "destination_short_description": "Jabi Park",
+    "destination_latlng": {
+      "lat": 9.0652,
+      "lng": 7.4257
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 3742,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T18:00:00",
+    "start_date_string": "06:00PM",
+    "end_date_time": "2024-12-21T18:58:00",
+    "end_date_string": "06:58PM",
+    "time_range_array": [
+      "2024-12-21T18:00:00",
+      "2024-12-21T18:58:00"
+    ],
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626769"
+  },
+  {
+    "trip_id": "trip_014",
+    "trip_group_id": "",
+    "user_id": "uid14",
+    "pickup_description": "Baze University Abuja",
+    "pickup_short_description": "Baze University",
+    "pickup_latlng": {
+      "lat": 9.0304,
+      "lng": 7.4557
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 1361,
+    "destination_description": "Asokoro District Hospital",
+    "destination_short_description": "Asokoro Hospital",
+    "destination_latlng": {
+      "lat": 9.0439,
+      "lng": 7.5213
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 2314,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "07:00PM",
+    "end_date_time": null,
+    "end_date_string": null,
+    "time_range_array": null,
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": true,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626809"
+  },
+  {
+    "trip_id": "trip_015",
+    "trip_group_id": "",
+    "user_id": "uid15",
+    "pickup_description": "Ministers\u2019 Hill",
+    "pickup_short_description": "Ministers\u2019 Hill",
+    "pickup_latlng": {
+      "lat": 9.0748,
+      "lng": 7.4811
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 1004,
+    "destination_description": "Asokoro District Hospital",
+    "destination_short_description": "Asokoro Hospital",
+    "destination_latlng": {
+      "lat": 9.0439,
+      "lng": 7.5213
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 985,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T18:00:00",
+    "start_date_string": "06:00PM",
+    "end_date_time": "2024-12-21T18:30:00",
+    "end_date_string": "06:30PM",
+    "time_range_array": [
+      "2024-12-21T18:00:00",
+      "2024-12-21T18:30:00"
+    ],
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626884"
+  },
+  {
+    "trip_id": "trip_016",
+    "trip_group_id": "",
+    "user_id": "uid16",
+    "pickup_description": "Mabushi Ultramodern Market",
+    "pickup_short_description": "Mabushi Market",
+    "pickup_latlng": {
+      "lat": 9.0661,
+      "lng": 7.4458
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 1221,
+    "destination_description": "Baze University Abuja",
+    "destination_short_description": "Baze University",
+    "destination_latlng": {
+      "lat": 9.0304,
+      "lng": 7.4557
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 1592,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T17:30:00",
+    "start_date_string": "05:30PM",
+    "end_date_time": "2024-12-21T18:01:00",
+    "end_date_string": "06:01PM",
+    "time_range_array": [
+      "2024-12-21T17:30:00",
+      "2024-12-21T18:01:00"
+    ],
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.626942"
+  },
+  {
+    "trip_id": "trip_017",
+    "trip_group_id": "",
+    "user_id": "uid17",
+    "pickup_description": "Transcorp Hilton Hotel",
+    "pickup_short_description": "Transcorp Hilton",
+    "pickup_latlng": {
+      "lat": 9.0736,
+      "lng": 7.4937
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 4493,
+    "destination_description": "Abuja Stadium (Moshood Abiola National Stadium)",
+    "destination_short_description": "Abuja Stadium",
+    "destination_latlng": {
+      "lat": 9.0138,
+      "lng": 7.4481
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 4484,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T18:30:00",
+    "start_date_string": "06:30PM",
+    "end_date_time": "2024-12-21T19:17:00",
+    "end_date_string": "07:17PM",
+    "time_range_array": [
+      "2024-12-21T18:30:00",
+      "2024-12-21T19:17:00"
+    ],
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.627091"
+  },
+  {
+    "trip_id": "trip_018",
+    "trip_group_id": "",
+    "user_id": "uid18",
+    "pickup_description": "Dunamis International Gospel Centre (Glory Dome)",
+    "pickup_short_description": "Glory Dome",
+    "pickup_latlng": {
+      "lat": 8.9934,
+      "lng": 7.5507
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 4597,
+    "destination_description": "Kubwa General Hospital",
+    "destination_short_description": "Kubwa Hospital",
+    "destination_latlng": {
+      "lat": 9.1717,
+      "lng": 7.3259
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 721,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "07:00PM",
+    "end_date_time": "2024-12-21T19:45:00",
+    "end_date_string": "07:45PM",
+    "time_range_array": [
+      "2024-12-21T19:00:00",
+      "2024-12-21T19:45:00"
+    ],
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.627153"
+  },
+  {
+    "trip_id": "trip_019",
+    "trip_group_id": "",
+    "user_id": "uid19",
+    "pickup_description": "Life Camp Abuja",
+    "pickup_short_description": "Life Camp",
+    "pickup_latlng": {
+      "lat": 9.0873,
+      "lng": 7.4429
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 2683,
+    "destination_description": "Ibrahim Babangida Way",
+    "destination_short_description": "IBB Way",
+    "destination_latlng": {
+      "lat": 9.0541,
+      "lng": 7.4887
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 4607,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "07:00PM",
+    "end_date_time": null,
+    "end_date_string": null,
+    "time_range_array": null,
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": true,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.627192"
+  },
+  {
+    "trip_id": "trip_020",
+    "trip_group_id": "",
+    "user_id": "uid20",
+    "pickup_description": "Wuse District Hospital",
+    "pickup_short_description": "Wuse Hospital",
+    "pickup_latlng": {
+      "lat": 9.0723,
+      "lng": 7.4589
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 1150,
+    "destination_description": "Central Bank of Nigeria (CBN) Headquarters",
+    "destination_short_description": "CBN Headquarters",
+    "destination_latlng": {
+      "lat": 9.0423,
+      "lng": 7.49
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 4907,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "07:00PM",
+    "end_date_time": "2024-12-21T19:45:00",
+    "end_date_string": "07:45PM",
+    "time_range_array": [
+      "2024-12-21T19:00:00",
+      "2024-12-21T19:45:00"
+    ],
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.627246"
+  },
+  {
+    "trip_id": "trip_021",
+    "trip_group_id": "",
+    "user_id": "uid21",
+    "pickup_description": "African University of Science and Technology",
+    "pickup_short_description": "AUST",
+    "pickup_latlng": {
+      "lat": 9.0445,
+      "lng": 7.4517
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 2319,
+    "destination_description": "Abuja Stadium (Moshood Abiola National Stadium)",
+    "destination_short_description": "Abuja Stadium",
+    "destination_latlng": {
+      "lat": 9.0138,
+      "lng": 7.4481
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 2368,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T19:30:00",
+    "start_date_string": "07:30PM",
+    "end_date_time": "2024-12-21T20:14:00",
+    "end_date_string": "08:14PM",
+    "time_range_array": [
+      "2024-12-21T19:30:00",
+      "2024-12-21T20:14:00"
+    ],
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.627303"
+  },
+  {
+    "trip_id": "trip_022",
+    "trip_group_id": "",
+    "user_id": "uid22",
+    "pickup_description": "Silverbird Entertainment Centre",
+    "pickup_short_description": "Silverbird Centre",
+    "pickup_latlng": {
+      "lat": 9.0495,
+      "lng": 7.4893
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 1399,
+    "destination_description": "African University of Science and Technology",
+    "destination_short_description": "AUST",
+    "destination_latlng": {
+      "lat": 9.0445,
+      "lng": 7.4517
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 656,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T18:30:00",
+    "start_date_string": "06:30PM",
+    "end_date_time": "2024-12-21T19:09:00",
+    "end_date_string": "07:09PM",
+    "time_range_array": [
+      "2024-12-21T18:30:00",
+      "2024-12-21T19:09:00"
+    ],
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.627357"
+  },
+  {
+    "trip_id": "trip_023",
+    "trip_group_id": "",
+    "user_id": "uid23",
+    "pickup_description": "Nigerian Customs Service Headquarters",
+    "pickup_short_description": "Customs HQ",
+    "pickup_latlng": {
+      "lat": 9.0406,
+      "lng": 7.4863
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 3842,
+    "destination_description": "University of Abuja Teaching Hospital",
+    "destination_short_description": "UniAbuja Hospital",
+    "destination_latlng": {
+      "lat": 8.9465,
+      "lng": 7.0658
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 601,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T17:30:00",
+    "start_date_string": "05:30PM",
+    "end_date_time": "2024-12-21T18:22:00",
+    "end_date_string": "06:22PM",
+    "time_range_array": [
+      "2024-12-21T17:30:00",
+      "2024-12-21T18:22:00"
+    ],
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.627413"
+  },
+  {
+    "trip_id": "trip_024",
+    "trip_group_id": "",
+    "user_id": "uid24",
+    "pickup_description": "Transcorp Hilton Hotel",
+    "pickup_short_description": "Transcorp Hilton",
+    "pickup_latlng": {
+      "lat": 9.0736,
+      "lng": 7.4937
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 1793,
+    "destination_description": "ICPC Headquarters",
+    "destination_short_description": "ICPC HQ",
+    "destination_latlng": {
+      "lat": 9.0704,
+      "lng": 7.4791
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 4580,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "07:00PM",
+    "end_date_time": "2024-12-21T19:44:00",
+    "end_date_string": "07:44PM",
+    "time_range_array": [
+      "2024-12-21T19:00:00",
+      "2024-12-21T19:44:00"
+    ],
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.627467"
+  },
+  {
+    "trip_id": "trip_025",
+    "trip_group_id": "",
+    "user_id": "uid25",
+    "pickup_description": "Transcorp Hilton Hotel",
+    "pickup_short_description": "Transcorp Hilton",
+    "pickup_latlng": {
+      "lat": 9.0736,
+      "lng": 7.4937
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 2978,
+    "destination_description": "Nigerian Communications Commission (NCC)",
+    "destination_short_description": "NCC",
+    "destination_latlng": {
+      "lat": 9.0532,
+      "lng": 7.4781
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 1858,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T18:30:00",
+    "start_date_string": "06:30PM",
+    "end_date_time": "2024-12-21T19:19:00",
+    "end_date_string": "07:19PM",
+    "time_range_array": [
+      "2024-12-21T18:30:00",
+      "2024-12-21T19:19:00"
+    ],
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.627520"
+  },
+  {
+    "trip_id": "trip_026",
+    "trip_group_id": "",
+    "user_id": "uid26",
+    "pickup_description": "Jabi Recreational Park",
+    "pickup_short_description": "Jabi Park",
+    "pickup_latlng": {
+      "lat": 9.0652,
+      "lng": 7.4257
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 1368,
+    "destination_description": "Dunamis International Gospel Centre (Glory Dome)",
+    "destination_short_description": "Glory Dome",
+    "destination_latlng": {
+      "lat": 8.9934,
+      "lng": 7.5507
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 653,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T19:30:00",
+    "start_date_string": "07:30PM",
+    "end_date_time": "2024-12-21T20:23:00",
+    "end_date_string": "08:23PM",
+    "time_range_array": [
+      "2024-12-21T19:30:00",
+      "2024-12-21T20:23:00"
+    ],
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.627586"
+  },
+  {
+    "trip_id": "trip_027",
+    "trip_group_id": "",
+    "user_id": "uid27",
+    "pickup_description": "Ministers\u2019 Hill",
+    "pickup_short_description": "Ministers\u2019 Hill",
+    "pickup_latlng": {
+      "lat": 9.0748,
+      "lng": 7.4811
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 3601,
+    "destination_description": "Baze University Abuja",
+    "destination_short_description": "Baze University",
+    "destination_latlng": {
+      "lat": 9.0304,
+      "lng": 7.4557
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 3474,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T17:30:00",
+    "start_date_string": "05:30PM",
+    "end_date_time": null,
+    "end_date_string": null,
+    "time_range_array": null,
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": true,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.627626"
+  },
+  {
+    "trip_id": "trip_028",
+    "trip_group_id": "",
+    "user_id": "uid28",
+    "pickup_description": "Mabushi Ultramodern Market",
+    "pickup_short_description": "Mabushi Market",
+    "pickup_latlng": {
+      "lat": 9.0661,
+      "lng": 7.4458
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 3905,
+    "destination_description": "Transcorp Hilton Hotel",
+    "destination_short_description": "Transcorp Hilton",
+    "destination_latlng": {
+      "lat": 9.0736,
+      "lng": 7.4937
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 3655,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T19:30:00",
+    "start_date_string": "07:30PM",
+    "end_date_time": "2024-12-21T20:26:00",
+    "end_date_string": "08:26PM",
+    "time_range_array": [
+      "2024-12-21T19:30:00",
+      "2024-12-21T20:26:00"
+    ],
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": false,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.627685"
+  },
+  {
+    "trip_id": "trip_029",
+    "trip_group_id": "",
+    "user_id": "uid29",
+    "pickup_description": "Transcorp Hilton Hotel",
+    "pickup_short_description": "Transcorp Hilton",
+    "pickup_latlng": {
+      "lat": 9.0736,
+      "lng": 7.4937
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 1999,
+    "destination_description": "Ministers\u2019 Hill",
+    "destination_short_description": "Ministers\u2019 Hill",
+    "destination_latlng": {
+      "lat": 9.0748,
+      "lng": 7.4811
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 2709,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "07:00PM",
+    "end_date_time": null,
+    "end_date_string": null,
+    "time_range_array": null,
+    "total_seat_count": 2,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": true,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.627749"
+  },
+  {
+    "trip_id": "trip_030",
+    "trip_group_id": "",
+    "user_id": "uid30",
+    "pickup_description": "Maitama Amusement Park",
+    "pickup_short_description": "Maitama Park",
+    "pickup_latlng": {
+      "lat": 9.0843,
+      "lng": 7.4841
+    },
+    "pickup_city": "Abuja",
+    "pickup_radius": 798,
+    "destination_description": "Wuse District Hospital",
+    "destination_short_description": "Wuse Hospital",
+    "destination_latlng": {
+      "lat": 9.0723,
+      "lng": 7.4589
+    },
+    "destination_city": "Abuja",
+    "destination_radius": 857,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "07:00PM",
+    "end_date_time": null,
+    "end_date_string": null,
+    "time_range_array": null,
+    "total_seat_count": 1,
+    "status": "unmatched",
+    "fully_matched": false,
+    "is_time_fixed": true,
+    "matched_trips": [],
+    "potential_trips": [],
+    "reserved": false,
+    "time_of_creation": "2024-12-28T11:35:35.627790"
+  }
+]

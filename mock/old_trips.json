@@ -1,0 +1,788 @@
+[
+  {
+    "trip_id": "1bb3d854-4f11-49e9-a7ac-c66a41770b45",
+    "user_id": "uid1",
+    "pickup_description": "Millennium Park Abuja",
+    "pickup_short_description": "Millennium Park",
+    "pickup_latlng": {
+      "lat": 9.0563,
+      "lng": 7.5045
+    },
+    "pickup_radius": 1426,
+    "destination_description": "Nigerian Communications Commission (NCC)",
+    "destination_short_description": "NCC",
+    "destination_latlng": {
+      "lat": 9.0532,
+      "lng": 7.4781
+    },
+    "destination_radius": 4697,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T17:30:00",
+    "start_date_string": "5:30PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "96673b76-33e3-4885-9c93-b961d1d92853",
+    "user_id": "uid2",
+    "pickup_description": "Gwagwalada Specialist Hospital",
+    "pickup_short_description": "Gwagwalada Hosp.",
+    "pickup_latlng": {
+      "lat": 8.94,
+      "lng": 7.079
+    },
+    "pickup_radius": 3878,
+    "destination_description": "Life Camp Abuja",
+    "destination_short_description": "Life Camp",
+    "destination_latlng": {
+      "lat": 9.0873,
+      "lng": 7.4429
+    },
+    "destination_radius": 1135,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T18:00:00",
+    "start_date_string": "6:00PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "38e027ec-f98d-403e-95e6-7f62045a4bd1",
+    "user_id": "uid3",
+    "pickup_description": "Jabi Recreational Park",
+    "pickup_short_description": "Jabi Park",
+    "pickup_latlng": {
+      "lat": 9.0652,
+      "lng": 7.4257
+    },
+    "pickup_radius": 1718,
+    "destination_description": "Nigerian Customs Service Headquarters",
+    "destination_short_description": "Customs HQ",
+    "destination_latlng": {
+      "lat": 9.0406,
+      "lng": 7.4863
+    },
+    "destination_radius": 525,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T17:00:00",
+    "start_date_string": "5:00PM",
+    "status": "unmatched",
+    "is_time_fixed": false,
+    "reserved": false,
+    "end_date_time": "2024-12-21T17:59:00",
+    "end_date_string": "5:59PM",
+    "time_range_array": [
+      "2024-12-21T17:00:00",
+      "2024-12-21T17:59:00"
+    ]
+  },
+  {
+    "trip_id": "2e208281-bfec-4fd6-a2ad-b08429505a33",
+    "user_id": "uid4",
+    "pickup_description": "Jabi Recreational Park",
+    "pickup_short_description": "Jabi Park",
+    "pickup_latlng": {
+      "lat": 9.0652,
+      "lng": 7.4257
+    },
+    "pickup_radius": 4457,
+    "destination_description": "Gudu Cemetery",
+    "destination_short_description": "Gudu Cemetery",
+    "destination_latlng": {
+      "lat": 9.0201,
+      "lng": 7.5143
+    },
+    "destination_radius": 4645,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T17:00:00",
+    "start_date_string": "5:00PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "b1c14630-1d09-4104-beda-ba66477e8ebc",
+    "user_id": "uid5",
+    "pickup_description": "Nigerian Customs Service Headquarters",
+    "pickup_short_description": "Customs HQ",
+    "pickup_latlng": {
+      "lat": 9.0406,
+      "lng": 7.4863
+    },
+    "pickup_radius": 3985,
+    "destination_description": "Jabi Motor Park",
+    "destination_short_description": "Jabi Motor",
+    "destination_latlng": {
+      "lat": 9.0725,
+      "lng": 7.4172
+    },
+    "destination_radius": 3624,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T17:30:00",
+    "start_date_string": "5:30PM",
+    "status": "unmatched",
+    "is_time_fixed": false,
+    "reserved": false,
+    "end_date_time": "2024-12-21T17:54:00",
+    "end_date_string": "5:54PM",
+    "time_range_array": [
+      "2024-12-21T17:30:00",
+      "2024-12-21T17:54:00"
+    ]
+  },
+  {
+    "trip_id": "0392d800-69f4-4f3e-9b00-b4af71b4f92f",
+    "user_id": "uid6",
+    "pickup_description": "ICPC Headquarters",
+    "pickup_short_description": "ICPC HQ",
+    "pickup_latlng": {
+      "lat": 9.0704,
+      "lng": 7.4791
+    },
+    "pickup_radius": 1725,
+    "destination_description": "Gwagwalada Specialist Hospital",
+    "destination_short_description": "Gwagwalada Hosp.",
+    "destination_latlng": {
+      "lat": 8.94,
+      "lng": 7.079
+    },
+    "destination_radius": 4254,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "7:00PM",
+    "status": "unmatched",
+    "is_time_fixed": false,
+    "reserved": false,
+    "end_date_time": "2024-12-21T19:45:00",
+    "end_date_string": "7:45PM",
+    "time_range_array": [
+      "2024-12-21T19:00:00",
+      "2024-12-21T19:45:00"
+    ]
+  },
+  {
+    "trip_id": "10b14999-a1ee-457e-8f24-c428bffc2663",
+    "user_id": "uid7",
+    "pickup_description": "Silverbird Entertainment Centre",
+    "pickup_short_description": "Silverbird",
+    "pickup_latlng": {
+      "lat": 9.0495,
+      "lng": 7.4893
+    },
+    "pickup_radius": 4161,
+    "destination_description": "Transcorp Hilton Hotel",
+    "destination_short_description": "Transcorp Hilton",
+    "destination_latlng": {
+      "lat": 9.0736,
+      "lng": 7.4937
+    },
+    "destination_radius": 1845,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T17:30:00",
+    "start_date_string": "5:30PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "988eac6a-b3e7-4793-948c-5b744445c0ea",
+    "user_id": "uid8",
+    "pickup_description": "Mabushi Ultramodern Market",
+    "pickup_short_description": "Mabushi Market",
+    "pickup_latlng": {
+      "lat": 9.0661,
+      "lng": 7.4458
+    },
+    "pickup_radius": 2587,
+    "destination_description": "Gudu Cemetery",
+    "destination_short_description": "Gudu Cemetery",
+    "destination_latlng": {
+      "lat": 9.0201,
+      "lng": 7.5143
+    },
+    "destination_radius": 3951,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T17:30:00",
+    "start_date_string": "5:30PM",
+    "status": "unmatched",
+    "is_time_fixed": false,
+    "reserved": false,
+    "end_date_time": "2024-12-21T18:26:00",
+    "end_date_string": "6:26PM",
+    "time_range_array": [
+      "2024-12-21T17:30:00",
+      "2024-12-21T18:26:00"
+    ]
+  },
+  {
+    "trip_id": "4f8d6091-4a09-4e44-9858-2b55931c600a",
+    "user_id": "uid9",
+    "pickup_description": "Millennium Park Abuja",
+    "pickup_short_description": "Millennium Park",
+    "pickup_latlng": {
+      "lat": 9.0563,
+      "lng": 7.5045
+    },
+    "pickup_radius": 1228,
+    "destination_description": "Maitama Amusement Park",
+    "destination_short_description": "Maitama Park",
+    "destination_latlng": {
+      "lat": 9.0843,
+      "lng": 7.4841
+    },
+    "destination_radius": 3335,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "7:00PM",
+    "status": "unmatched",
+    "is_time_fixed": false,
+    "reserved": false,
+    "end_date_time": "2024-12-21T19:11:00",
+    "end_date_string": "7:11PM",
+    "time_range_array": [
+      "2024-12-21T19:00:00",
+      "2024-12-21T19:11:00"
+    ]
+  },
+  {
+    "trip_id": "b509ca29-cef6-4fdb-9873-3ea61176a884",
+    "user_id": "uid10",
+    "pickup_description": "Abuja Arts and Crafts Village",
+    "pickup_short_description": "Arts Village",
+    "pickup_latlng": {
+      "lat": 9.0438,
+      "lng": 7.4909
+    },
+    "pickup_radius": 1965,
+    "destination_description": "Ibrahim Babangida Way",
+    "destination_short_description": "IBB Way",
+    "destination_latlng": {
+      "lat": 9.0541,
+      "lng": 7.4887
+    },
+    "destination_radius": 2034,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T17:00:00",
+    "start_date_string": "5:00PM",
+    "status": "unmatched",
+    "is_time_fixed": false,
+    "reserved": false,
+    "end_date_time": "2024-12-21T17:38:00",
+    "end_date_string": "5:38PM",
+    "time_range_array": [
+      "2024-12-21T17:00:00",
+      "2024-12-21T17:38:00"
+    ]
+  },
+  {
+    "trip_id": "9b4a6d3d-b8cb-48ec-ba41-f55ca6d9e02d",
+    "user_id": "uid11",
+    "pickup_description": "Gwagwalada Specialist Hospital",
+    "pickup_short_description": "Gwagwalada Hosp.",
+    "pickup_latlng": {
+      "lat": 8.94,
+      "lng": 7.079
+    },
+    "pickup_radius": 3315,
+    "destination_description": "Silverbird Entertainment Centre",
+    "destination_short_description": "Silverbird",
+    "destination_latlng": {
+      "lat": 9.0495,
+      "lng": 7.4893
+    },
+    "destination_radius": 3010,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T17:30:00",
+    "start_date_string": "5:30PM",
+    "status": "unmatched",
+    "is_time_fixed": false,
+    "reserved": false,
+    "end_date_time": "2024-12-21T17:40:00",
+    "end_date_string": "5:40PM",
+    "time_range_array": [
+      "2024-12-21T17:30:00",
+      "2024-12-21T17:40:00"
+    ]
+  },
+  {
+    "trip_id": "08f212d9-d4ff-4682-a073-29da6f1692ab",
+    "user_id": "uid12",
+    "pickup_description": "Nigerian Communications Commission (NCC)",
+    "pickup_short_description": "NCC",
+    "pickup_latlng": {
+      "lat": 9.0532,
+      "lng": 7.4781
+    },
+    "pickup_radius": 1895,
+    "destination_description": "Abuja Arts and Crafts Village",
+    "destination_short_description": "Arts Village",
+    "destination_latlng": {
+      "lat": 9.0438,
+      "lng": 7.4909
+    },
+    "destination_radius": 4790,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T17:30:00",
+    "start_date_string": "5:30PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "a1309972-d4f4-4389-8885-6c8152a377bd",
+    "user_id": "uid13",
+    "pickup_description": "Maitama Amusement Park",
+    "pickup_short_description": "Maitama Park",
+    "pickup_latlng": {
+      "lat": 9.0843,
+      "lng": 7.4841
+    },
+    "pickup_radius": 3273,
+    "destination_description": "Dunamis International Gospel Centre (Glory Dome)",
+    "destination_short_description": "Glory Dome",
+    "destination_latlng": {
+      "lat": 8.9934,
+      "lng": 7.5507
+    },
+    "destination_radius": 3982,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T17:30:00",
+    "start_date_string": "5:30PM",
+    "status": "unmatched",
+    "is_time_fixed": false,
+    "reserved": false,
+    "end_date_time": "2024-12-21T18:07:00",
+    "end_date_string": "6:07PM",
+    "time_range_array": [
+      "2024-12-21T17:30:00",
+      "2024-12-21T18:07:00"
+    ]
+  },
+  {
+    "trip_id": "a85f701a-b267-4ff2-85e0-b97d9a821665",
+    "user_id": "uid14",
+    "pickup_description": "Gwagwalada Specialist Hospital",
+    "pickup_short_description": "Gwagwalada Hosp.",
+    "pickup_latlng": {
+      "lat": 8.94,
+      "lng": 7.079
+    },
+    "pickup_radius": 1568,
+    "destination_description": "Abuja Stadium (Moshood Abiola National Stadium)",
+    "destination_short_description": "Abuja Stadium",
+    "destination_latlng": {
+      "lat": 9.0138,
+      "lng": 7.4481
+    },
+    "destination_radius": 3616,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T17:00:00",
+    "start_date_string": "5:00PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "7e96c1e3-93fe-46bd-8c68-f337621bb4f9",
+    "user_id": "uid15",
+    "pickup_description": "Life Camp Abuja",
+    "pickup_short_description": "Life Camp",
+    "pickup_latlng": {
+      "lat": 9.0873,
+      "lng": 7.4429
+    },
+    "pickup_radius": 741,
+    "destination_description": "Abuja Arts and Crafts Village",
+    "destination_short_description": "Arts Village",
+    "destination_latlng": {
+      "lat": 9.0438,
+      "lng": 7.4909
+    },
+    "destination_radius": 1728,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T17:00:00",
+    "start_date_string": "5:00PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "0c233113-9860-4d19-a525-2cd2aa9a1c42",
+    "user_id": "uid16",
+    "pickup_description": "Transcorp Hilton Hotel",
+    "pickup_short_description": "Transcorp Hilton",
+    "pickup_latlng": {
+      "lat": 9.0736,
+      "lng": 7.4937
+    },
+    "pickup_radius": 2791,
+    "destination_description": "Millennium Park Abuja",
+    "destination_short_description": "Millennium Park",
+    "destination_latlng": {
+      "lat": 9.0563,
+      "lng": 7.5045
+    },
+    "destination_radius": 4151,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T18:30:00",
+    "start_date_string": "6:30PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "271b8f60-6613-4f6f-89a8-1cceea15bbb3",
+    "user_id": "uid17",
+    "pickup_description": "Baze University Abuja",
+    "pickup_short_description": "Baze University",
+    "pickup_latlng": {
+      "lat": 9.0304,
+      "lng": 7.4557
+    },
+    "pickup_radius": 1732,
+    "destination_description": "Utako District Market",
+    "destination_short_description": "Utako Market",
+    "destination_latlng": {
+      "lat": 9.065,
+      "lng": 7.4302
+    },
+    "destination_radius": 1755,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T18:00:00",
+    "start_date_string": "6:00PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "934a3853-99b1-4632-8c00-669d700ba6ec",
+    "user_id": "uid18",
+    "pickup_description": "Ibrahim Babangida Way",
+    "pickup_short_description": "IBB Way",
+    "pickup_latlng": {
+      "lat": 9.0541,
+      "lng": 7.4887
+    },
+    "pickup_radius": 2802,
+    "destination_description": "Jabi Recreational Park",
+    "destination_short_description": "Jabi Park",
+    "destination_latlng": {
+      "lat": 9.0652,
+      "lng": 7.4257
+    },
+    "destination_radius": 3778,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T18:00:00",
+    "start_date_string": "6:00PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "76ae3c1a-84a7-4af2-a0f9-45901b274586",
+    "user_id": "uid19",
+    "pickup_description": "Mabushi Ultramodern Market",
+    "pickup_short_description": "Mabushi Market",
+    "pickup_latlng": {
+      "lat": 9.0661,
+      "lng": 7.4458
+    },
+    "pickup_radius": 4195,
+    "destination_description": "Nigerian Communications Commission (NCC)",
+    "destination_short_description": "NCC",
+    "destination_latlng": {
+      "lat": 9.0532,
+      "lng": 7.4781
+    },
+    "destination_radius": 3186,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T17:30:00",
+    "start_date_string": "5:30PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "49a09589-5ba4-46cd-9d1e-4ecd874fd098",
+    "user_id": "uid20",
+    "pickup_description": "Kubwa General Hospital",
+    "pickup_short_description": "Kubwa Hosp.",
+    "pickup_latlng": {
+      "lat": 9.1717,
+      "lng": 7.3259
+    },
+    "pickup_radius": 3148,
+    "destination_description": "Zuma Rock",
+    "destination_short_description": "Zuma Rock",
+    "destination_latlng": {
+      "lat": 9.1202,
+      "lng": 7.2146
+    },
+    "destination_radius": 1096,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "7:00PM",
+    "status": "unmatched",
+    "is_time_fixed": false,
+    "reserved": false,
+    "end_date_time": "2024-12-21T19:14:00",
+    "end_date_string": "7:14PM",
+    "time_range_array": [
+      "2024-12-21T19:00:00",
+      "2024-12-21T19:14:00"
+    ]
+  },
+  {
+    "trip_id": "869ffd07-17c8-4e70-aaa2-8d54e94bb88f",
+    "user_id": "uid21",
+    "pickup_description": "Gwagwalada Specialist Hospital",
+    "pickup_short_description": "Gwagwalada Hosp.",
+    "pickup_latlng": {
+      "lat": 8.94,
+      "lng": 7.079
+    },
+    "pickup_radius": 1825,
+    "destination_description": "Transcorp Hilton Hotel",
+    "destination_short_description": "Transcorp Hilton",
+    "destination_latlng": {
+      "lat": 9.0736,
+      "lng": 7.4937
+    },
+    "destination_radius": 2474,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "7:00PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "71a61a5e-25d7-4daa-94e3-f9dde85d1aae",
+    "user_id": "uid22",
+    "pickup_description": "Central Bank of Nigeria (CBN) Headquarters",
+    "pickup_short_description": "CBN HQ",
+    "pickup_latlng": {
+      "lat": 9.0423,
+      "lng": 7.49
+    },
+    "pickup_radius": 3953,
+    "destination_description": "Ibrahim Babangida Way",
+    "destination_short_description": "IBB Way",
+    "destination_latlng": {
+      "lat": 9.0541,
+      "lng": 7.4887
+    },
+    "destination_radius": 3349,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "7:00PM",
+    "status": "unmatched",
+    "is_time_fixed": false,
+    "reserved": false,
+    "end_date_time": "2024-12-21T19:32:00",
+    "end_date_string": "7:32PM",
+    "time_range_array": [
+      "2024-12-21T19:00:00",
+      "2024-12-21T19:32:00"
+    ]
+  },
+  {
+    "trip_id": "e51d155f-36ee-40a9-a560-42748fb5483b",
+    "user_id": "uid23",
+    "pickup_description": "Dunamis International Gospel Centre (Glory Dome)",
+    "pickup_short_description": "Glory Dome",
+    "pickup_latlng": {
+      "lat": 8.9934,
+      "lng": 7.5507
+    },
+    "pickup_radius": 531,
+    "destination_description": "Mabushi Ultramodern Market",
+    "destination_short_description": "Mabushi Market",
+    "destination_latlng": {
+      "lat": 9.0661,
+      "lng": 7.4458
+    },
+    "destination_radius": 3062,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T18:00:00",
+    "start_date_string": "6:00PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "f8ff37fa-036f-463d-8a28-f0338f00281a",
+    "user_id": "uid24",
+    "pickup_description": "Baze University Abuja",
+    "pickup_short_description": "Baze University",
+    "pickup_latlng": {
+      "lat": 9.0304,
+      "lng": 7.4557
+    },
+    "pickup_radius": 4907,
+    "destination_description": "Ibrahim Babangida Way",
+    "destination_short_description": "IBB Way",
+    "destination_latlng": {
+      "lat": 9.0541,
+      "lng": 7.4887
+    },
+    "destination_radius": 1864,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T17:00:00",
+    "start_date_string": "5:00PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "bdcb8eaf-d3a3-496f-a9e2-4e03b51ebc16",
+    "user_id": "uid25",
+    "pickup_description": "Baze University Abuja",
+    "pickup_short_description": "Baze University",
+    "pickup_latlng": {
+      "lat": 9.0304,
+      "lng": 7.4557
+    },
+    "pickup_radius": 3707,
+    "destination_description": "Jabi Recreational Park",
+    "destination_short_description": "Jabi Park",
+    "destination_latlng": {
+      "lat": 9.0652,
+      "lng": 7.4257
+    },
+    "destination_radius": 2914,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T18:30:00",
+    "start_date_string": "6:30PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "1adede96-3a5d-4820-a771-40291e16e98e",
+    "user_id": "uid26",
+    "pickup_description": "Maitama Amusement Park",
+    "pickup_short_description": "Maitama Park",
+    "pickup_latlng": {
+      "lat": 9.0843,
+      "lng": 7.4841
+    },
+    "pickup_radius": 3285,
+    "destination_description": "Baze University Abuja",
+    "destination_short_description": "Baze University",
+    "destination_latlng": {
+      "lat": 9.0304,
+      "lng": 7.4557
+    },
+    "destination_radius": 2779,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T17:00:00",
+    "start_date_string": "5:00PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "ecce225a-ea81-4660-b696-50235b0ed25a",
+    "user_id": "uid27",
+    "pickup_description": "Abuja Arts and Crafts Village",
+    "pickup_short_description": "Arts Village",
+    "pickup_latlng": {
+      "lat": 9.0438,
+      "lng": 7.4909
+    },
+    "pickup_radius": 2724,
+    "destination_description": "Millennium Park Abuja",
+    "destination_short_description": "Millennium Park",
+    "destination_latlng": {
+      "lat": 9.0563,
+      "lng": 7.5045
+    },
+    "destination_radius": 4978,
+    "seat_count": 2,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "7:00PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "6fdfe79e-11f3-4a8d-91ae-9101956e4739",
+    "user_id": "uid28",
+    "pickup_description": "Transcorp Hilton Hotel",
+    "pickup_short_description": "Transcorp Hilton",
+    "pickup_latlng": {
+      "lat": 9.0736,
+      "lng": 7.4937
+    },
+    "pickup_radius": 1318,
+    "destination_description": "Maitama Amusement Park",
+    "destination_short_description": "Maitama Park",
+    "destination_latlng": {
+      "lat": 9.0843,
+      "lng": 7.4841
+    },
+    "destination_radius": 2078,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T17:30:00",
+    "start_date_string": "5:30PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "b124cd77-df12-42d9-bec6-fa0dd843c6c5",
+    "user_id": "uid29",
+    "pickup_description": "EFCC Headquarters",
+    "pickup_short_description": "EFCC HQ",
+    "pickup_latlng": {
+      "lat": 9.0523,
+      "lng": 7.4409
+    },
+    "pickup_radius": 4948,
+    "destination_description": "Abuja Stadium (Moshood Abiola National Stadium)",
+    "destination_short_description": "Abuja Stadium",
+    "destination_latlng": {
+      "lat": 9.0138,
+      "lng": 7.4481
+    },
+    "destination_radius": 2970,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T19:00:00",
+    "start_date_string": "7:00PM",
+    "status": "unmatched",
+    "is_time_fixed": true,
+    "reserved": false
+  },
+  {
+    "trip_id": "a1c3dbec-ac2e-4243-93d3-ec641684d6df",
+    "user_id": "uid30",
+    "pickup_description": "Ibrahim Babangida Way",
+    "pickup_short_description": "IBB Way",
+    "pickup_latlng": {
+      "lat": 9.0541,
+      "lng": 7.4887
+    },
+    "pickup_radius": 3372,
+    "destination_description": "Jabi Motor Park",
+    "destination_short_description": "Jabi Motor",
+    "destination_latlng": {
+      "lat": 9.0725,
+      "lng": 7.4172
+    },
+    "destination_radius": 978,
+    "seat_count": 1,
+    "start_date_time": "2024-12-21T18:00:00",
+    "start_date_string": "6:00PM",
+    "status": "unmatched",
+    "is_time_fixed": false,
+    "reserved": false,
+    "end_date_time": "2024-12-21T18:56:00",
+    "end_date_string": "6:56PM",
+    "time_range_array": [
+      "2024-12-21T18:00:00",
+      "2024-12-21T18:56:00"
+    ]
+  }
+]

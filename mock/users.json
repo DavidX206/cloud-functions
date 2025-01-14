@@ -1,0 +1,475 @@
+[
+    {
+        "email": "user1@mail.com",
+        "photo_url": "images/user1.jpg",
+        "uid": "uid1",
+        "created_time": "2023-11-24T22:20:00",
+        "phone_number": "+1234567801",
+        "first_name": "Isabella",
+        "last_name": "Garcia",
+        "transactions": [],
+        "ticket_count": 0
+    },
+    {
+        "email": "user2@demo.net",
+        "photo_url": "images/user2.jpg",
+        "uid": "uid2",
+        "created_time": "2023-03-18T14:17:28",
+        "phone_number": "+1234567802",
+        "first_name": "Michael",
+        "last_name": "Hernandez",
+        "transactions": [
+            {
+                "id": "tx3",
+                "amount": 142,
+                "date": "2023-10-13T21:08:43"
+            },
+            {
+                "id": "tx4",
+                "amount": 147,
+                "date": "2023-09-23T15:47:49"
+            }
+        ],
+        "ticket_count": 5
+    },
+    {
+        "email": "user3@test.org",
+        "photo_url": "images/user3.jpg",
+        "uid": "uid3",
+        "created_time": "2023-05-31T05:32:24",
+        "phone_number": "+1234567803",
+        "first_name": "Alice",
+        "last_name": "Martinez",
+        "transactions": [],
+        "ticket_count": 1
+    },
+    {
+        "email": "user4@test.org",
+        "photo_url": "images/user4.jpg",
+        "uid": "uid4",
+        "created_time": "2023-02-04T14:18:47",
+        "phone_number": "+1234567804",
+        "first_name": "James",
+        "last_name": "Martinez",
+        "transactions": [
+            {
+                "id": "tx7",
+                "amount": 139,
+                "date": "2023-07-31T10:51:17"
+            },
+            {
+                "id": "tx8",
+                "amount": 195,
+                "date": "2023-01-09T10:30:40"
+            }
+        ],
+        "ticket_count": 1
+    },
+    {
+        "email": "user5@demo.net",
+        "photo_url": "images/user5.jpg",
+        "uid": "uid5",
+        "created_time": "2023-07-13T13:11:34",
+        "phone_number": "+1234567805",
+        "first_name": "Isabella",
+        "last_name": "Doe",
+        "transactions": [
+            {
+                "id": "tx9",
+                "amount": 90,
+                "date": "2023-12-11T11:28:28"
+            },
+            {
+                "id": "tx10",
+                "amount": 40,
+                "date": "2023-04-07T21:19:06"
+            }
+        ],
+        "ticket_count": 4
+    },
+    {
+        "email": "user6@test.org",
+        "photo_url": "images/user6.jpg",
+        "uid": "uid6",
+        "created_time": "2023-07-20T04:18:07",
+        "phone_number": "+1234567806",
+        "first_name": "Emma",
+        "last_name": "Hernandez",
+        "transactions": [],
+        "ticket_count": 2
+    },
+    {
+        "email": "user7@mail.com",
+        "photo_url": "images/user7.jpg",
+        "uid": "uid7",
+        "created_time": "2023-04-17T02:46:30",
+        "phone_number": "+1234567807",
+        "first_name": "Olivia",
+        "last_name": "Smith",
+        "transactions": [],
+        "ticket_count": 2
+    },
+    {
+        "email": "user8@example.com",
+        "photo_url": "images/user8.jpg",
+        "uid": "uid8",
+        "created_time": "2023-03-27T11:17:44",
+        "phone_number": "+1234567808",
+        "first_name": "Benjamin",
+        "last_name": "Smith",
+        "transactions": [],
+        "ticket_count": 2
+    },
+    {
+        "email": "user9@mail.com",
+        "photo_url": "images/user9.jpg",
+        "uid": "uid9",
+        "created_time": "2023-02-17T02:34:47",
+        "phone_number": "+1234567809",
+        "first_name": "Isabella",
+        "last_name": "Lopez",
+        "transactions": [],
+        "ticket_count": 5
+    },
+    {
+        "email": "user10@test.org",
+        "photo_url": "images/user10.jpg",
+        "uid": "uid10",
+        "created_time": "2023-08-14T07:07:16",
+        "phone_number": "+1234567810",
+        "first_name": "Emma",
+        "last_name": "Garcia",
+        "transactions": [],
+        "ticket_count": 0
+    },
+    {
+        "email": "user11@example.com",
+        "photo_url": "images/user11.jpg",
+        "uid": "uid11",
+        "created_time": "2023-11-26T07:15:59",
+        "phone_number": "+1234567811",
+        "first_name": "Isabella",
+        "last_name": "Lopez",
+        "transactions": [
+            {
+                "id": "tx21",
+                "amount": 200,
+                "date": "2023-08-23T15:31:37"
+            },
+            {
+                "id": "tx22",
+                "amount": 171,
+                "date": "2023-04-10T21:40:47"
+            }
+        ],
+        "ticket_count": 1
+    },
+    {
+        "email": "user12@example.com",
+        "photo_url": "images/user12.jpg",
+        "uid": "uid12",
+        "created_time": "2023-11-07T19:36:34",
+        "phone_number": "+1234567812",
+        "first_name": "Benjamin",
+        "last_name": "Martinez",
+        "transactions": [],
+        "ticket_count": 0
+    },
+    {
+        "email": "user13@mail.com",
+        "photo_url": "images/user13.jpg",
+        "uid": "uid13",
+        "created_time": "2023-05-10T07:52:38",
+        "phone_number": "+1234567813",
+        "first_name": "Alice",
+        "last_name": "Lopez",
+        "transactions": [
+            {
+                "id": "tx25",
+                "amount": 80,
+                "date": "2023-08-09T17:44:51"
+            },
+            {
+                "id": "tx26",
+                "amount": 137,
+                "date": "2023-05-09T15:15:52"
+            }
+        ],
+        "ticket_count": 1
+    },
+    {
+        "email": "user14@example.com",
+        "photo_url": "images/user14.jpg",
+        "uid": "uid14",
+        "created_time": "2023-05-15T13:48:50",
+        "phone_number": "+1234567814",
+        "first_name": "Michael",
+        "last_name": "Martinez",
+        "transactions": [
+            {
+                "id": "tx27",
+                "amount": 93,
+                "date": "2023-09-28T21:45:14"
+            },
+            {
+                "id": "tx28",
+                "amount": 93,
+                "date": "2023-05-22T03:26:37"
+            }
+        ],
+        "ticket_count": 4
+    },
+    {
+        "email": "user15@mail.com",
+        "photo_url": "images/user15.jpg",
+        "uid": "uid15",
+        "created_time": "2023-09-27T23:31:12",
+        "phone_number": "+1234567815",
+        "first_name": "Michael",
+        "last_name": "Davis",
+        "transactions": [],
+        "ticket_count": 1
+    },
+    {
+        "email": "user16@demo.net",
+        "photo_url": "images/user16.jpg",
+        "uid": "uid16",
+        "created_time": "2023-08-04T18:58:53",
+        "phone_number": "+1234567816",
+        "first_name": "Sophia",
+        "last_name": "Smith",
+        "transactions": [],
+        "ticket_count": 0
+    },
+    {
+        "email": "user17@test.org",
+        "photo_url": "images/user17.jpg",
+        "uid": "uid17",
+        "created_time": "2023-03-28T12:36:23",
+        "phone_number": "+1234567817",
+        "first_name": "Alice",
+        "last_name": "Martinez",
+        "transactions": [],
+        "ticket_count": 4
+    },
+    {
+        "email": "user18@mail.com",
+        "photo_url": "images/user18.jpg",
+        "uid": "uid18",
+        "created_time": "2023-12-17T13:26:04",
+        "phone_number": "+1234567818",
+        "first_name": "Emma",
+        "last_name": "Doe",
+        "transactions": [
+            {
+                "id": "tx35",
+                "amount": 107,
+                "date": "2023-03-17T05:46:44"
+            },
+            {
+                "id": "tx36",
+                "amount": 129,
+                "date": "2023-04-15T18:18:45"
+            }
+        ],
+        "ticket_count": 0
+    },
+    {
+        "email": "user19@example.com",
+        "photo_url": "images/user19.jpg",
+        "uid": "uid19",
+        "created_time": "2023-01-03T21:31:15",
+        "phone_number": "+1234567819",
+        "first_name": "Sophia",
+        "last_name": "Martinez",
+        "transactions": [],
+        "ticket_count": 2
+    },
+    {
+        "email": "user20@demo.net",
+        "photo_url": "images/user20.jpg",
+        "uid": "uid20",
+        "created_time": "2023-08-17T17:06:36",
+        "phone_number": "+1234567820",
+        "first_name": "Isabella",
+        "last_name": "Smith",
+        "transactions": [],
+        "ticket_count": 5
+    },
+    {
+        "email": "user21@example.com",
+        "photo_url": "images/user21.jpg",
+        "uid": "uid21",
+        "created_time": "2023-11-15T13:48:31",
+        "phone_number": "+1234567821",
+        "first_name": "Isabella",
+        "last_name": "Davis",
+        "transactions": [],
+        "ticket_count": 4
+    },
+    {
+        "email": "user22@demo.net",
+        "photo_url": "images/user22.jpg",
+        "uid": "uid22",
+        "created_time": "2023-03-03T15:00:22",
+        "phone_number": "+1234567822",
+        "first_name": "Alice",
+        "last_name": "Doe",
+        "transactions": [
+            {
+                "id": "tx43",
+                "amount": 164,
+                "date": "2023-03-21T03:33:44"
+            },
+            {
+                "id": "tx44",
+                "amount": 16,
+                "date": "2023-12-27T23:42:25"
+            }
+        ],
+        "ticket_count": 0
+    },
+    {
+        "email": "user23@mail.com",
+        "photo_url": "images/user23.jpg",
+        "uid": "uid23",
+        "created_time": "2023-07-08T16:14:23",
+        "phone_number": "+1234567823",
+        "first_name": "Alice",
+        "last_name": "Doe",
+        "transactions": [],
+        "ticket_count": 0
+    },
+    {
+        "email": "user24@demo.net",
+        "photo_url": "images/user24.jpg",
+        "uid": "uid24",
+        "created_time": "2023-12-27T08:53:16",
+        "phone_number": "+1234567824",
+        "first_name": "Emma",
+        "last_name": "Garcia",
+        "transactions": [
+            {
+                "id": "tx47",
+                "amount": 127,
+                "date": "2023-03-23T03:30:40"
+            },
+            {
+                "id": "tx48",
+                "amount": 57,
+                "date": "2023-08-24T08:48:30"
+            }
+        ],
+        "ticket_count": 5
+    },
+    {
+        "email": "user25@example.com",
+        "photo_url": "images/user25.jpg",
+        "uid": "uid25",
+        "created_time": "2023-10-26T05:04:10",
+        "phone_number": "+1234567825",
+        "first_name": "Alice",
+        "last_name": "Davis",
+        "transactions": [],
+        "ticket_count": 2
+    },
+    {
+        "email": "user26@test.org",
+        "photo_url": "images/user26.jpg",
+        "uid": "uid26",
+        "created_time": "2023-08-18T16:59:53",
+        "phone_number": "+1234567826",
+        "first_name": "Sophia",
+        "last_name": "Martinez",
+        "transactions": [
+            {
+                "id": "tx51",
+                "amount": 152,
+                "date": "2023-01-14T03:33:33"
+            },
+            {
+                "id": "tx52",
+                "amount": 58,
+                "date": "2023-11-10T21:57:18"
+            }
+        ],
+        "ticket_count": 1
+    },
+    {
+        "email": "user27@demo.net",
+        "photo_url": "images/user27.jpg",
+        "uid": "uid27",
+        "created_time": "2023-04-07T07:51:47",
+        "phone_number": "+1234567827",
+        "first_name": "John",
+        "last_name": "Brown",
+        "transactions": [],
+        "ticket_count": 0
+    },
+    {
+        "email": "user28@example.com",
+        "photo_url": "images/user28.jpg",
+        "uid": "uid28",
+        "created_time": "2023-11-18T00:52:41",
+        "phone_number": "+1234567828",
+        "first_name": "Alice",
+        "last_name": "Garcia",
+        "transactions": [
+            {
+                "id": "tx55",
+                "amount": 112,
+                "date": "2023-12-04T09:27:25"
+            },
+            {
+                "id": "tx56",
+                "amount": 198,
+                "date": "2023-06-18T14:41:49"
+            }
+        ],
+        "ticket_count": 0
+    },
+    {
+        "email": "user29@mail.com",
+        "photo_url": "images/user29.jpg",
+        "uid": "uid29",
+        "created_time": "2023-04-08T16:15:06",
+        "phone_number": "+1234567829",
+        "first_name": "Michael",
+        "last_name": "Lopez",
+        "transactions": [
+            {
+                "id": "tx57",
+                "amount": 89,
+                "date": "2023-09-26T14:10:49"
+            },
+            {
+                "id": "tx58",
+                "amount": 85,
+                "date": "2023-08-25T07:25:46"
+            }
+        ],
+        "ticket_count": 3
+    },
+    {
+        "email": "user30@demo.net",
+        "photo_url": "images/user30.jpg",
+        "uid": "uid30",
+        "created_time": "2023-06-09T22:57:29",
+        "phone_number": "+1234567830",
+        "first_name": "Isabella",
+        "last_name": "Brown",
+        "transactions": [],
+        "ticket_count": 5
+    },
+    {
+        "email": "user31@example.com",
+        "photo_url": "images/user31.jpg",
+        "uid": "uid31",
+        "created_time": "2023-12-01T12:00:00",
+        "phone_number": "+1234567831",
+        "first_name": "Liam",
+        "last_name": "Johnson",
+        "transactions": [],
+        "ticket_count": 0
+    }
+]
