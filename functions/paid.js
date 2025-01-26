@@ -51,47 +51,65 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
         };
 
         const calculatePickupOverlapGapWithNpt = async (trip, npt) => {
-            const tripDoc = await db.collection(`users/${trip.user_id}/trips`).doc(trip.trip_id).get();
-            const tripData = tripDoc.data();
-            const pickupDistance = tripData.potential_trips.find(
+            let tripData = trip;
+            if (!trip.matched_trips) {
+                const tripDoc = await db.collection(`users/${trip.user_id}/trips`).doc(trip.trip_id).get();
+                tripData = tripDoc.data();
+            }
+            const pickupDistance = (tripData.potential_trips || tripData.matched_trips).find(
                 (trip) => trip.trip_id === npt.trip_id,
               ).pickup_distance;
             const pickupOverlapGap = 150 - (tripData.pickup_radius + npt.pickup_radius - pickupDistance);
-            return pickupOverlapGap;
+            return pickupOverlapGap >= 0 ? pickupOverlapGap : null;
         };
 
         const calculateDestinationOverlapGapWithNpt = async (trip, npt) => {
-            const tripDoc = await db.collection(`users/${trip.user_id}/trips`).doc(trip.trip_id).get();
-            const tripData = tripDoc.data();
+            let tripData = trip;
+            if (!trip.matched_trips) {
+                const tripDoc = await db.collection(`users/${trip.user_id}/trips`).doc(trip.trip_id).get();
+                tripData = tripDoc.data();
+            }
             const destinationDistance = (tripData.potential_trips || tripData.matched_trips).find(
                 (trip) => trip.trip_id === npt.trip_id,
               ).destination_distance;
             const destinationOverlapGap = 150 - (tripData.destination_radius + npt.destination_radius - destinationDistance);
-            return destinationOverlapGap;
+            return destinationOverlapGap >= 0 ? destinationOverlapGap : null;
         };
 
         const calculatePickupOverlapGap = async (trip, trip2) => {
-            const tripDoc = await db.collection(`users/${trip.user_id}/trips`).doc(trip.trip_id).get();
-            const tripData = tripDoc.data();
-            const trip2Doc = await db.collection(`users/${trip2.user_id}/trips`).doc(trip2.trip_id).get();
-            const trip2Data = trip2Doc.data();
+            let tripData = trip;
+            let trip2Data = trip2;
+            if (!trip.matched_trips) {
+                const tripDoc = await db.collection(`users/${trip.user_id}/trips`).doc(trip.trip_id).get();
+                tripData = tripDoc.data();
+            }
+            if (!trip2.matched_trips) {
+                const trip2Doc = await db.collection(`users/${trip2.user_id}/trips`).doc(trip2.trip_id).get();
+                trip2Data = trip2Doc.data();
+            }
             const pickupDistance = (tripData.potential_trips || tripData.matched_trips).find(
                 (trip) => trip.trip_id === trip2.trip_id,
               ).pickup_distance;
             const pickupOverlapGap = 150 - (tripData.pickup_radius + trip2Data.pickup_radius - pickupDistance);
-            return pickupOverlapGap;
+            return pickupOverlapGap >= 0 ? pickupOverlapGap : null;
         };
 
         const calculateDestinationOverlapGap = async (trip, trip2) => {
-            const tripDoc = await db.collection(`users/${trip.user_id}/trips`).doc(trip.trip_id).get();
-            const tripData = tripDoc.data();
-            const trip2Doc = await db.collection(`users/${trip2.user_id}/trips`).doc(trip2.trip_id).get();
-            const trip2Data = trip2Doc.data();
+            let tripData = trip;
+            let trip2Data = trip2;
+            if (!trip.matched_trips) {
+                const tripDoc = await db.collection(`users/${trip.user_id}/trips`).doc(trip.trip_id).get();
+                tripData = tripDoc.data();
+            }
+            if (!trip2.matched_trips) {
+                const trip2Doc = await db.collection(`users/${trip2.user_id}/trips`).doc(trip2.trip_id).get();
+                trip2Data = trip2Doc.data();
+            }
             const destinationDistance = (tripData.potential_trips || tripData.matched_trips).find(
                 (trip) => trip.trip_id === trip2.trip_id,
               ).destination_distance;
             const destinationOverlapGap = 150 - (tripData.destination_radius + trip2Data.destination_radius - destinationDistance);
-            return destinationOverlapGap;
+            return destinationOverlapGap >= 0 ? destinationOverlapGap : null;
         };
 
         const calculateCentroid = (locations) => {
@@ -521,7 +539,7 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                 return !properMatch || (notInMatchedTrips && notInPotentialTrips);
             });
 
-            const updatedTripObstructedTripMembers = updatedSeatObstructedTripMembers.map(member => {
+            const updatedTripObstructedTripMembers = await Promise.all(updatedSeatObstructedTripMembers.map(async (member) => {
                 if (obstructedTrips.some(trip => trip.trip_id === member.trip_id)) {
                     const obstructingTripMembers = member.obstructing_trip_members || [];
                     notInPotentialTrips = newTripData.potential_trips.some(pt => pt.trip_id !== member.trip_id);
@@ -534,15 +552,15 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                             ...obstructingTripMembers,
                             {
                                 trip_id: npt.trip_id,
-                                pickup_overlap_gap: (notInMatchedTrips && notInPotentialTrips) ? null: calculatePickupOverlapGapWithNpt(member, npt),
-                                destination_overlap_gap: (notInMatchedTrips && notInPotentialTrips) ? null : calculateDestinationOverlapGapWithNpt(member, npt),
+                                pickup_overlap_gap: (notInMatchedTrips && notInPotentialTrips) ? null: await calculatePickupOverlapGapWithNpt(member, npt),
+                                destination_overlap_gap: (notInMatchedTrips && notInPotentialTrips) ? null : await calculateDestinationOverlapGapWithNpt(member, npt),
                                 unknown: (notInMatchedTrips && notInPotentialTrips),
                             },
                         ],
                     };
                 }
                 return member;
-            });
+            }));
 
             return updatedTripObstructedTripMembers;
         };
@@ -577,7 +595,7 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                 // Add choiceTG members to potential_trips
                 const updatedPotentialTrips = [
                     ...oldTripData.potential_trips,
-                    ...choiceTGMembers.filter(member =>
+                    ...(choiceTGMembers.filter(member =>
                         oldTripData.matched_trips.some(mt => mt.trip_id === member.trip_id),
                     ).map(member => ({
                         trip_id: member.trip_id,
@@ -595,7 +613,7 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                         group_largest_pickup_overlap_gap: calculateOverlapGap(choiceTripGroupData)[0], // Calculate overlap if applicable
                         group_largest_destination_overlap_gap: calculateOverlapGap(choiceTripGroupData)[1],
                         unknown_trip_obstruction: choiceTripGroupData.potential_trip_members.find((pt) => pt.trip_id === oldTripData.trip_id).unknown_trip_obstruction, // Add logic if applicable
-                    })),
+                    }))),
                 ];
                 await oldTripDocRef.update({
                     status: updatedMatchedTrips.length > 0 ? "matched" : "unmatched",
@@ -626,48 +644,48 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
 
         const addNPTTripsToChoiceTG = async (choiceTripGroupDocRef, choiceTripGroupData, npt, nptMatchedTrips, nptPotentialTrips, totalSeatCount) => {
             let hasUnkown;
-            const newPotentialTripMembers = [
+            const newPotentialTripMembers = await Promise.all([
                 ...nptMatchedTrips.filter(trip => !choiceTripGroupData.trip_members.some(member => member.trip_id === trip.trip_id)),
                 ...nptPotentialTrips.filter(trip => !choiceTripGroupData.trip_members.some(member => member.trip_id === trip.trip_id)),
-            ].map(trip => {
-                const [oldTripData, oldTripDocRef] = getOldTripData(trip.trip_id, trip.user_id);
+            ].map(async (trip) => {
+                const [oldTripData, oldTripDocRef] = await getOldTripData(trip.trip_id, trip.user_id);
                 return {
                 trip_id: trip.trip_id,
                 obstructing_trip_members: trip.proper_match ? [
-                    ...choiceTripGroupData.trip_group_members.filter(member => member.trip_id !== npt.trip_id)
-                    .map(member => {
+                    ...(await Promise.all(choiceTripGroupData.trip_group_members.filter(member => member.trip_id !== npt.trip_id)
+                    .map(async (member) => {
                         const notInPotentialTrips = oldTripData.potential_trips.some(pt => pt.trip_id !== member.trip_id);
                         const notInMatchedTrips = oldTripData.matched_trips.some(mt => mt.trip_id !== member.trip_id);
                         (notInMatchedTrips && notInPotentialTrips) ? hasUnkown = true: hasUnkown = false;
                         return {
                         trip_id: member.trip_id,
-                        pickup_overlap_gap: (notInMatchedTrips && notInPotentialTrips) ? null: calculatePickupOverlapGap(trip, member),
-                        destination_overlap_gap: (notInMatchedTrips && notInPotentialTrips) ? null: calculateDestinationOverlapGap(trip, member),
+                        pickup_overlap_gap: (notInMatchedTrips && notInPotentialTrips) ? null: await calculatePickupOverlapGap(trip, member),
+                        destination_overlap_gap: (notInMatchedTrips && notInPotentialTrips) ? null: await calculateDestinationOverlapGap(trip, member),
                         unknown: (notInMatchedTrips && notInPotentialTrips),
                 };
-                }), {
+                }))), {
                     trip_id: npt.trip_id,
-                    pickup_overlap_gap: calculatePickupOverlapGap(trip, npt),
-                    destination_overlap_gap: calculateDestinationOverlapGap(trip, npt),
+                    pickup_overlap_gap: await calculatePickupOverlapGapWithNpt(trip, npt),
+                    destination_overlap_gap: await calculateDestinationOverlapGapWithNpt(trip, npt),
                     unknown: false,
                 }] : [
-                    ...choiceTripGroupData.trip_group_members.filter(member => member.trip_id !== npt.trip_id)
-                    .map(member => {
+                    ...(await Promise.all(choiceTripGroupData.trip_group_members.filter(member => member.trip_id !== npt.trip_id)
+                    .map(async (member) => {
                         const notInPotentialTrips = oldTripData.potential_trips.some(pt => pt.trip_id !== member.trip_id);
                         const notInMatchedTrips = oldTripData.matched_trips.some(mt => mt.trip_id !== member.trip_id);
                         return {
                         trip_id: member.trip_id,
-                        pickup_overlap_gap: (notInMatchedTrips && notInPotentialTrips) ? null: calculatePickupOverlapGap(trip, member),
-                        destination_overlap_gap: (notInMatchedTrips && notInPotentialTrips) ? null: calculateDestinationOverlapGap(trip, member),
+                        pickup_overlap_gap: (notInMatchedTrips && notInPotentialTrips) ? null: await calculatePickupOverlapGap(trip, member),
+                        destination_overlap_gap: (notInMatchedTrips && notInPotentialTrips) ? null: await calculateDestinationOverlapGap(trip, member),
                         unknown: (notInMatchedTrips && notInPotentialTrips),
                 };
-                })],
+                })))],
                 trip_obstruction: true,
                 seat_obstruction: trip.seat_count > (4 - totalSeatCount),
                 seat_count: trip.seat_count,
                 unknown_trip_obstruction: hasUnkown,
             };
-        });
+        }));
 
             await choiceTripGroupDocRef.update({
                 potential_trip_members: [
@@ -705,8 +723,8 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                 ...nptPotentialTrips.filter(trip => !choiceTripGroupData.trip_members.some(member => member.trip_id === trip.trip_id) && trip.mutual===true),
             ];
 
-            const updatedMatchedTrips = [...filteredMatchedTrips, ...filteredPotentialTrips].map(trip => {
-                const [oldTripData, oldTripDocRef] = getOldTripData(trip.trip_id, trip.user_id);
+            const updatedMatchedTrips = await Promise.all([...filteredMatchedTrips, ...filteredPotentialTrips].map(async (trip) => {
+                const [oldTripData, oldTripDocRef] = await getOldTripData(trip.trip_id, trip.user_id);
                 return {
                 ...oldTripData,
                 matched_trips: oldTripData.matched_trips.filter(mt => mt.trip_id !== tripId),
@@ -731,10 +749,10 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                     },
                 ],
                 };
-            });
+            }));
 
-            const altUpdatedMatchedTrips = [...altFilteredMatchedTrips, ...altFilteredPotentialTrips].map(trip => {
-                const [oldTripData, oldTripDocRef] = getOldTripData(trip.trip_id, trip.user_id);
+            const altUpdatedMatchedTrips = await Promise.all([...altFilteredMatchedTrips, ...altFilteredPotentialTrips].map(async (trip) => {
+                const [oldTripData, oldTripDocRef] = await getOldTripData(trip.trip_id, trip.user_id);
                 return {
                 ...oldTripData,
                 matched_trips: oldTripData.matched_trips.map(nmt => {
@@ -747,10 +765,10 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                     return nmt;
                 }),
                 };
-            });
+            }));
 
-            const alt2UpdatedPotentialTrips = [...alt2FilteredMatchedTrips, ...alt2FilteredPotentialTrips].map(trip => {
-                const [oldTripData, oldTripDocRef] = getOldTripData(trip.trip_id, trip.user_id);
+            const alt2UpdatedPotentialTrips = await Promise.all([...alt2FilteredMatchedTrips, ...alt2FilteredPotentialTrips].map(async (trip) => {
+                const [oldTripData, oldTripDocRef] = await getOldTripData(trip.trip_id, trip.user_id);
                 return {
                 ...oldTripData,
                 potential_trips: oldTripData.potential_trips.map(npt => {
@@ -769,7 +787,7 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                     return npt;
                 }),
                 };
-            });
+            }));
 
             await Promise.all(updatedMatchedTrips.map(async trip => {
                 const tripDocRef = db.collection(`users/${trip.user_id}trips`).doc(trip.trip_id);
@@ -822,8 +840,8 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
             if (!isProperMatch(newTripData, oldTrip)) {
                 obstructingMembers.push({
                     trip_id: oldTrip.trip_id,
-                    pickup_overlap_gap: calculatePickupOverlapGapWithNpt(oldTrip, newTripData),
-                    destination_overlap_gap: calculateDestinationOverlapGapWithNpt(oldTrip, newTripData),
+                    pickup_overlap_gap: await calculatePickupOverlapGapWithNpt(oldTrip, newTripData),
+                    destination_overlap_gap: await calculateDestinationOverlapGapWithNpt(oldTrip, newTripData),
                     unknown: false,
                 });
             }
@@ -843,16 +861,16 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                         seat_count: newTripData.seat_count,
                     },
                 ],
-                potential_trip_members: [...newTripData.matched_trips, ...newTripData.potential_trips].map((trip) => {
+                potential_trip_members: await Promise.all([...newTripData.matched_trips, ...newTripData.potential_trips].map(async (trip) => {
                     return {
                         trip_id: trip.trip_id,
-                        obstructing_trip_members: generateObstructingTripMembersFromGroupWithJustNpt(trip),
+                        obstructing_trip_members: await generateObstructingTripMembersFromGroupWithJustNpt(trip),
                         trip_obstruction: isProperMatch(newTripData, trip),
                         seat_obstruction: false,
                         seat_count: trip.seat_count,
                         unknown_trip_obstruction: false,
                     };
-                }),
+                })),
                 total_seat_count: 0,
                 pickup_location_suggestions: [],
                 destination_suggestions: [],
@@ -877,8 +895,8 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                 ...newTripData.potential_trips.filter(trip => trip.mutual===true),
             ];
 
-            const updatedMatchedTrips = filteredMatchedTrips.map(trip => {
-                const [oldTripData, oldTripDocRef] = getOldTripData(trip.trip_id, trip.user_id);
+            const updatedMatchedTrips = await Promise.all(filteredMatchedTrips.map(async (trip) => {
+                const [oldTripData, oldTripDocRef] = await getOldTripData(trip.trip_id, trip.user_id);
                 return {
                 ...oldTripData,
                 matched_trips: oldTripData.matched_trips.map(nmt => {
@@ -891,10 +909,10 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                     return nmt;
                 }),
                 };
-            });
+            }));
 
-            const updatedPotentialTrips = filteredPotentialTrips.map(trip => {
-                const [oldTripData, oldTripDocRef] = getOldTripData(trip.trip_id, trip.user_id);
+            const updatedPotentialTrips = await Promise.all(filteredPotentialTrips.map(async (trip) => {
+                const [oldTripData, oldTripDocRef] = await getOldTripData(trip.trip_id, trip.user_id);
                 return {
                 ...oldTripData,
                 potential_trips: oldTripData.potential_trips.map(npt => {
@@ -912,7 +930,7 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                     return npt;
                 }),
                 };
-            });
+            }));
 
             await Promise.all(updatedMatchedTrips.map(async trip => {
                 const tripDocRef = db.collection(`users/${trip.user_id}trips`).doc(trip.trip_id);
@@ -974,8 +992,8 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                 ...reservedTripData.potential_trips.filter(trip => trip.mutual===true && !isProperMatch(newTripData, trip)),
             ];
 
-            const altUpdatedMatchedTrips = altFilteredMatchedTrips.map(trip => {
-                const [oldTripData, oldTripDocRef] = getOldTripData(trip.trip_id, trip.user_id);
+            const altUpdatedMatchedTrips = await Promise.all(altFilteredMatchedTrips.map(async (trip) => {
+                const [oldTripData, oldTripDocRef] = await getOldTripData(trip.trip_id, trip.user_id);
                 return {
                 ...oldTripData,
                 matched_trips: oldTripData.matched_trips.filter(mt => mt.trip_id !== reservedTripData.trip_id),
@@ -1000,10 +1018,10 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                     },
                 ],
                 };
-            });
+            }));
 
-            const altUpdatedPotentialTrips = altFilteredMatchedTrips.map(trip => {
-                const [oldTripData, oldTripDocRef] = getOldTripData(trip.trip_id, trip.user_id);
+            const altUpdatedPotentialTrips = await Promise.all(altFilteredMatchedTrips.map(async (trip) => {
+                const [oldTripData, oldTripDocRef] = await getOldTripData(trip.trip_id, trip.user_id);
                 return {
                 ...oldTripData,
                 potential_trips: oldTripData.potential_trips.map(npt => {
@@ -1015,7 +1033,7 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
                     return npt;
                 }),
                 };
-            });
+            }));
             await Promise.all(altUpdatedMatchedTrips.map(async trip => {
                 const tripDocRef = db.collection(`users/${trip.user_id}trips`).doc(trip.trip_id);
                 await tripDocRef.update({
@@ -1101,23 +1119,23 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
 
                     const specificTrips = getTripsThatHaveReservedTripInPotentialTrips(reservedTrip);
 
-                    const tripsThatHaveReservedTripInPotentialTripsAlongWithObstructionTrueAndProperMatchTrue = specificTrips.map(async (trip) => {
+                    const tripsThatHaveReservedTripInPotentialTripsAlongWithObstructionTrueAndProperMatchTrue = await Promise.all(specificTrips.map(async (trip) => {
                         const tripDoc = await db.collection(`users/${trip.user_id}/trips`).doc(trip.trip_id).get();
                         const tripData = tripDoc.data();
                         const hasObstructionTrueAndProperMatchFalse = tripData.potential_trips.some((potentialTrip) => {
                             return potentialTrip.trip_id === reservedTrip.trip_id && potentialTrip.obstruction === true && potentialTrip.proper_match === true;
                         });
                         return hasObstructionTrueAndProperMatchFalse ? {tripData, trip} : null;
-                    }).filter(result => result !== null);
+                    })).filter(result => result !== null);
 
-                    const tripsThatHaveReservedTripInPotentialTripsAlongWithObstructionTrueAndProperMatchFalse = specificTrips.map(async (trip) => {
+                    const tripsThatHaveReservedTripInPotentialTripsAlongWithObstructionTrueAndProperMatchFalse = await Promise.all(specificTrips.map(async (trip) => {
                         const tripDoc = await db.collection(`users/${trip.user_id}/trips`).doc(trip.trip_id).get();
                         const tripData = tripDoc.data();
                         const hasObstructionTrueAndProperMatchFalse = tripData.potential_trips.some((potentialTrip) => {
                             return potentialTrip.trip_id === reservedTrip.trip_id && potentialTrip.obstruction === true && potentialTrip.proper_match === false;
                         });
                         return hasObstructionTrueAndProperMatchFalse ? {tripData, trip} : null;
-                    }).filter(result => result !== null);
+                    })).filter(result => result !== null);
 
                     for (const {tripData, trip} of tripsThatHaveReservedTripInPotentialTripsAlongWithObstructionTrueAndProperMatchFalse) {
                         const tripDocRef = db.collection(`users/${trip.user_id}/trips`).doc(trip.trip_id);
@@ -1191,9 +1209,12 @@ exports.tripPaidFunction = onDocumentUpdated("users/{userId}/trips/{tripId}",
 
             await updateNewlyObstructedMatchedTripsFromNPT(choiceTripGroupDocRef, newTripData, newTripData.matched_trips, newTripData.potential_trips, updatedTotalSeatCount);
 
-            const tripGroupMembersData = choiceTripGroupData.trip_group_members.map((member) => {
-                return getOldTripData(member.trip_id)[0];
-            });
+            const tripGroupMembersData = await Promise.all(
+                choiceTripGroupData.trip_group_members.map(async (member) => {
+                    const oldTripData = await getOldTripData(member.trip_id);
+                    return oldTripData[0];
+                }),
+            );
 
             const pickupLocations = tripGroupMembersData.map((member) => member.pickup_latlng);
             const destinationLocations = tripGroupMembersData.map((member) => member.destination_latlng);

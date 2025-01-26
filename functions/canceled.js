@@ -1,5 +1,5 @@
-/* eslint-disable no-empty */
 /* eslint-disable linebreak-style */
+/* eslint-disable no-empty */
 /* eslint-disable indent */
 /* eslint-disable max-len */
 const {onDocumentUpdated} = require("firebase-functions/v2/firestore");
@@ -22,7 +22,7 @@ exports.tripCanceledFunction = onDocumentUpdated("users/{userId}/trips/{tripId}"
         }
 
         const newTripData = snapshot.after.data();
-        const previousData = snapshot.before.data();
+        // const previousData = snapshot.before.data();
 
         const getOldTripData = async (tripId) => {
             try {
@@ -238,7 +238,7 @@ exports.tripCanceledFunction = onDocumentUpdated("users/{userId}/trips/{tripId}"
               continue;
             }
 
-            const matchedTripData = matchedTripRef.data();
+            // const matchedTripData = matchedTripRef.data();
 
             // Check if the match is mutual
             if (matchedTrip.mutual) {
@@ -288,7 +288,7 @@ exports.tripCanceledFunction = onDocumentUpdated("users/{userId}/trips/{tripId}"
                 continue;
               }
 
-              const potentialTripData = potentialTripRef.data();
+              // const potentialTripData = potentialTripRef.data();
 
               // Check if the potential match is mutual
               if (potentialTrip.mutual) {
@@ -537,7 +537,7 @@ exports.tripCanceledFunction = onDocumentUpdated("users/{userId}/trips/{tripId}"
           }
 
           if (newTripData.paid) {
-            //add logic to delete cancelled trip from trip_group_members array
+            // add logic to delete cancelled trip from trip_group_members array
 
             // Query to check if this trip is the only member in the trip group
             const tripGroupData = await getTripGroupData(newTripData.trip_group_id);
@@ -562,8 +562,8 @@ exports.tripCanceledFunction = onDocumentUpdated("users/{userId}/trips/{tripId}"
                     const pickupDistances = pickupLocations.map((loc) => calculateDistance(loc, pickupCentroid));
                     const destinationDistances = destinationLocations.map((loc) => calculateDistance(loc, destinationCentroid));
 
-                    const farthestPickup = pickupLocations[pickupDistances.indexOf(Math.max(...pickupDistances))];
-                    const farthestDestination = destinationLocations[destinationDistances.indexOf(Math.max(...destinationDistances))];
+                    // const farthestPickup = pickupLocations[pickupDistances.indexOf(Math.max(...pickupDistances))];
+                    // const farthestDestination = destinationLocations[destinationDistances.indexOf(Math.max(...destinationDistances))];
 
                     const origins = `${pickupLocations.map((loc) => `${loc.lat},${loc.lng}`).join("|")}|${destinationLocations.map((loc) => `${loc.lat},${loc.lng}`).join("|")}`;
 

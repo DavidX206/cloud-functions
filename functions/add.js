@@ -249,7 +249,7 @@ exports.tripAddedFunction = onDocumentCreated("users/{userId}/trips/{tripId}",
                 user_id: member.user_id,
             }));
 
-            const obstructingMembers = groupMembers.map(async (member) => {
+            const obstructingMembers = Promise.all(groupMembers.map(async (member) => {
                 const mt = matchedTrips.find((mt) => mt.trip_id === member.trip_id);
                 const pD = mt ? pickupDistance[matchedTrips.findIndex((trip) => trip.trip_id === mt.trip_id)].distance : null;
                 const dD = mt ? destinationDistance[matchedTrips.findIndex((trip) => trip.trip_id === mt.trip_id)].distance : null;
@@ -265,8 +265,9 @@ exports.tripAddedFunction = onDocumentCreated("users/{userId}/trips/{tripId}",
                         unknown: mt ? false : true,
                     };
                 }
-            });
-            return obstructingMembers;
+                return null;
+            }));
+            return obstructingMembers.filter(Boolean);
         };
 
         const checkOldTripGroupPotentialTrips = async (oldTripGroupData, oldTripGroupDocRef, {fully_matched = false}) => {
