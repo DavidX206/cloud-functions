@@ -1,5 +1,6 @@
 
 const admin = require("firebase-admin");
+const {FieldValue} = require("firebase-admin/firestore")
 const serviceAccount = require("./service-account/starlit-cycle-403120-firebase-adminsdk-j65vo-630de9d3ae.json");
 const users = require("./mock/users.json");
 const trips = require("./mock/trips.json");
