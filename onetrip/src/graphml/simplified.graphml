@@ -1,0 +1,576 @@
+<graphml>
+	<graph id="G" edgedefault="directed">
+		<node id="n0">
+			<data key="d4"><y:Label.Text>Start</y:Label.Text></data></node>
+		<node id="n1">
+			<data key="d4"><y:Label.Text>NPT document update:status: paid</y:Label.Text></data></node>
+		<node id="n2">
+			<data key="d4"><y:Label.Text>Is NPT reserved?</y:Label.Text></data></node>
+		<node id="n3">
+			<data key="d4"><y:Label.Text>NPT’s reserving trip’s trip group will be the Choice Trip Group that the NPT will join.</y:Label.Text></data></node>
+		<node id="n4">
+			<data key="d4"><y:Label.Text>NPT document update:Update fieldstrip_group_id: choice TG IDtotal_seat_count: choice trip’s TG total_seat_count + NPT’s seat_countreserved: falsereserving trip ID: Delete this field</y:Label.Text></data></node>
+		<node id="n5">
+			<data key="d4"><y:Label.Text>NPT’s reserving trip’s document update:Update its total_seat_count fieldtotal_seat_count: choice TG total_seat_count + NPT’s seat_countIn its matched_trips array field, update the element containing NPTtotal_seat_count: choice TG total_seat_count + NPT’s seat_countpaid: true trip_group_id: choice TG IDreserving: false</y:Label.Text></data></node>
+		<node id="n6">
+			<data key="d4"><y:Label.Text>Get all NPT’s matched trips</y:Label.Text></data></node>
+		<node id="n7">
+			<data key="d4"><y:Label.Text>From each of NPT’s paid matched trips, get all their distinct trip groups (different matched trips may be in the same trip group). If there’s only one trip group it will be the Choice Trip Group that the NPT will join.</y:Label.Text></data></node>
+		<node id="n8">
+			<data key="d4"><y:Label.Text>Any of them with status of paid?</y:Label.Text></data></node>
+		<node id="n9">
+			<data key="d4"><y:Label.Text>Is the number of trip groups found &gt; 1?</y:Label.Text></data></node>
+		<node id="n10">
+			<data key="d4"><y:Label.Text>Get the trip group with the least number of trips in it. This will be the Choice Trip Group that the NPT will join.</y:Label.Text></data></node>
+		<node id="n11">
+			<data key="d4"><y:Label.Text>Are there more than one trip groups that have the least number of trips?</y:Label.Text></data></node>
+		<node id="n12">
+			<data key="d4"><y:Label.Text>Get the trip group that NPT that has the least: total pickup distance apart + total destination distance apart, from the members of that trip group. This will be the Choice Trip Group that the NPT will join.</y:Label.Text></data></node>
+		<node id="n13">
+			<data key="d4"><y:Label.Text>Are there more than one trip groups that have the least distance apart from pickup distance?</y:Label.Text></data></node>
+		<node id="n14">
+			<data key="d4"><y:Label.Text>Randomly pick one of these trip groups to be the Choice Trip Group that the NPT will join.</y:Label.Text></data></node>
+		<node id="n15">
+			<data key="d4"><y:Label.Text>NPT document update:Update fieldstrip_group_id: choice TG IDtotal_seat_count: choice trip’s TG total_seat_count + NPT’s seat_count</y:Label.Text></data></node>
+		<node id="n16">
+			<data key="d4"><y:Label.Text>Does choice TG have only 1 member?</y:Label.Text></data></node>
+		<node id="n17">
+			<data key="d4"><y:Label.Text>In this sole trip group member’s trip document, from it’s matched trips field, get the trip that it’s reserving (look for the trip in which the reserving key is true)</y:Label.Text></data></node>
+		<node id="n18">
+			<data key="d4"><y:Label.Text>Sole TG member document updateIn it’s matched trips array field, update the element containing the trip its reservingreserving: false</y:Label.Text></data></node>
+		<node id="n19">
+			<data key="d4"><y:Label.Text>Trip that sole trip member was reserving document updatereserved: falsereserving_trip_id: Delete</y:Label.Text></data></node>
+		<node id="n20">
+			<data key="d4"><y:Label.Text>From the trip that sole trip group member was reserving, get all its matched trips with mutual as true and potential trips with mutual as false</y:Label.Text></data></node>
+		<node id="n21">
+			<data key="d4"><y:Label.Text>In each of their potential_trips array, check the index containing the trip that sole trip group member was reservingGet the trips that have reserving_trip_obstruction as true AND proper_match as falseAlso get the trips reserving_trip_obstruction as true AND proper_match as true</y:Label.Text></data></node>
+		<node id="n22">
+			<data key="d4"><y:Label.Text>All the matched trips with mutual as false and potential trips with mutual as true of the trip that sole trip group member was reserving that were reserving trip obstructed and do not proper match it documents updateUpdate each of their reserving_trip_obstruction fieldsreserving_trip_obstruction: false</y:Label.Text></data></node>
+		<node id="n23">
+			<data key="d4"><y:Label.Text>All the matched trips with mutual as false and potential trips with mutual as true of the trip that sole trip group member was reserving that were reserving trip obstructed and proper match it documents updateIn each of their potential trips fields delete the elements containing the trip that sole trip member was reservingAdd the trip that sole trip member was reserving to each of their matched trips array fieldstrip_id: The trip that sole trip member was reserving’s IDtrip_group_id: N/Apaid: falsepickup_radius: relevant valuedestination_radius: relevant valuepickup_distance: relevant valuedestination_distance: relevant valuemutual: If this trip was in the trip that sole trip member was reserving’s matched trip array then true, else false reserving: false</y:Label.Text></data></node>
+		<node id="n24">
+			<data key="d4"><y:Label.Text>Trip that sole trip member was reserving document updateIn it’s matched trips array, update all the elements containing it’s matched trips with mutual as false that proper match itmutual: trueIn it’s potential trips array, update all the elements containing it’s potential trips with mutual as true that proper match itmutual: false</y:Label.Text></data></node>
+		<node id="n25">
+			<data key="d4"><y:Label.Text>All choice TG members trip documents update:Update each of their total_seat_count fieldtotal_seat_count: choice TG total_seat_count + NPT’s seat_countIn each of their matched_trips array field, update the element containing NPTpaid: true trip_group_id: choice TG ID</y:Label.Text></data></node>
+		<node id="n26">
+			<data key="d4"><y:Label.Text>Choice trip group document update:update total_seat_count fieldtotal_seat_count: current total_seat_count + NPT’s seat_countIn it’s potential_trip_members field delete the element containing NPTAdd new trip_group_members elementtrip_id: NPT’s IDfirst_name: NPT’s user first namephone_number: NPT’s user phone_numberphoto_url: NPT’s user photoseat_count: NPT’s user seat_count</y:Label.Text></data></node>
+		<node id="n27">
+			<data key="d4"><y:Label.Text>In the choice TG’s potential trip members array, get all the trips that are not seat obstructed (seat_obstruction = false), but are now seat obstructed due to NPT’s entry (seat_count is greater than 4 - [reserving trips TG total_seat_count + NPT’s seat count]).NB: Remember to exclude the NPT from from among the trips to check in the potential trip members array, as it’s going to be deleted.</y:Label.Text></data></node>
+		<node id="n28">
+			<data key="d4"><y:Label.Text>Choice trip group document update:In it’s potential_trip_members array field, update all the elements containing the potential trip members that have just been seat obstructedseat_obstruction: true</y:Label.Text></data></node>
+		<node id="n29">
+			<data key="d4"><y:Label.Text>In the choice TG’s potential trip members array, get all the potential trip members that do not proper match the NPT (meaning they're in the NPT’s potential_trips field but proper_match is false or they're not even in both the matched_trips and potential_trips fields of the NPT, they're unknown), go over them in a loop (be sure to exclude NPT from the check among the trips in the array).</y:Label.Text></data></node>
+		<node id="n30">
+			<data key="d4"><y:Label.Text>Choice trip group document update:In it’s potential_trip_members array field, update the elements containing the potential trip member that does not proper match the NPTtrip_obstruction: true</y:Label.Text></data></node>
+		<node id="n31">
+			<data key="d4"><y:Label.Text>Is potential trip member not trip obstructed?(trip_obstruct = false)</y:Label.Text></data></node>
+		<node id="n32">
+			<data key="d4"><y:Label.Text>Choice trip group document update:In it’s potential trip members array field, in the element containing the potential trip member that does not proper match the NPT, add new obstructing_trip_members map element trip_id: NPT’s IDpickup_overlap_gap: Relevant value if applicabledestination_overlap_gap: Relevant value if applicableunknown: Relevant value if applicableNB: pickup_overlap_gap and destination_overlap_gap are applicable if NPT is not unknown, unknown is applicable if NPT is unknownEnd loop after the last here after the last iteration</y:Label.Text></data></node>
+		<node id="n33">
+			<data key="d4"><y:Label.Text>In the choice TG’s potential_trips array, get all the trips that were originally seat obstructed or trip obstructed or both, prior to the NPT’s entry. (be sure to exclude NPT from the check among the trips in the array).</y:Label.Text></data></node>
+		<node id="n34">
+			<data key="d4"><y:Label.Text>All choice TG’s potential_trip_members that were originally obstructed document updates:In each of their potential_trips array fields, update the elements containing the choice TG memberstotal_seat_count: choice TG total_seat_count + NPT’s seat_count</y:Label.Text></data></node>
+		<node id="n35">
+			<data key="d4"><y:Label.Text>In the choice TG’s potential_trips array, get all the trips that were not obstructed at all, but are now seat obstructed or trip obstructed or both, due to the addition of NPT to the TG (be sure to exclude NPT from the check among the trips in the array).</y:Label.Text></data></node>
+		<node id="n36">
+			<data key="d4"><y:Label.Text>All choice TG’s potential_trip_members that weren't obstructed but have just been obstructed document updates:In each of their matched_trips array fields, delete all the elements containing the choice TG trip membersIn each of their potential_trips array fields, add new elements containing the choice TG memberstrip_id: trip members trip IDpaid: truetrip_group_id: choice TG IDpickup_radius: relevant valuedestination_radius: relevant valuepickup_distance: relevant valuedestination_distance: relevant valueproper_match: truetrip_obstruction: relevant valueseat_obstruction: relevant valuereserving_trip_id: falsemutual: opposite (!) of the mutual value in the deleted matched_trips field containing the particular choice TG membergroup_largest_pickup_overlap_gap: relevant value if applicable (if trip does not proper match NPT and NPT is not unknown to it, then there is a pickup overlap gap between them)group_largest_destination_overlap_gap: relevant value if applicable (if trip does not proper match NPT and NPT is not unknown to it then there is a destination overlap gap between them)unknown_trip_obstruction: relevant valuetotal_seat_count: choice TG total_seat_count + NPT’s seat_count +++</y:Label.Text></data></node>
+		<node id="n37">
+			<data key="d4"><y:Label.Text>From the choice TG’s potential_trip_members that weren't obstructed but have just been obstructed, check for the ones that do not have any other matched trip apart from the just removed choice TG members</y:Label.Text></data></node>
+		<node id="n38">
+			<data key="d4"><y:Label.Text>All choice TG potential_trip_members that do not have any other matched_trip’s document update:Update each of their status to unmatchedstatus: unmatched</y:Label.Text></data></node>
+		<node id="n39">
+			<data key="d4"><y:Label.Text>All choice TG members trip document update:In each of their matched_trips or potential_trips fields, update all the elements containing the choice TG’s potential_trip_members that have just been obstructedUpdate either their matched_trips field or potential_trips field depending on where the individual potential trip members are in each of the trip group membersmutual: opposite (!) the current value</y:Label.Text></data></node>
+		<node id="n40">
+			<data key="d4"><y:Label.Text>Get all NPT’s matched trips (exclude choice TG’s members) and potential trips. Go over them and get the ones that aren’t already potential trip group members of the choice TG.</y:Label.Text></data></node>
+		<node id="n41">
+			<data key="d4"><y:Label.Text>Choice TG document update:Add all NPT’s matched trips and potential trips that aren’t already potential trip members to its potential_trip_members fieldtrip_id: NPT’s matched/potential trip IDobstructing_trip_members:all choice TG’s members, also NPT (only if it doesn’t proper match NPT) with their relevant keys which are: trip_id, pickup_overlap_gap, destination_overlap_gap and unknowntrip_obstruction: trueseat_obstruction: relevant valueseat_count: NPT’s matched/potential trip’s seat countunknown trip_obstruction: relevant value</y:Label.Text></data></node>
+		<node id="n42">
+			<data key="d4"><y:Label.Text>Get all NPT’s matched trips (excluding the choice TG members) with mutual as true, go over them and find the ones who do not proper match all the members of the choice TG or whose seat_count is greater than 4 - (choice TG total_seat_count + NPT’s seat count)</y:Label.Text></data></node>
+		<node id="n43">
+			<data key="d4"><y:Label.Text>All the NPT’s newly obstructed matched trips (excluding choice TG members) with mutual as true documents updates:Add NPT to each of their potential_trips array fieldtrip_id: NPT‘s’ IDpaid: truetrip_group_id: NPT’s TG IDpickup_radius: relevant valuedestination_radius: relevant valuepickup_distance: relevant valuedestination_distance: relevant valueproper_match: truetrip_obstruction: relevant value (may be T or F)seat_obstruction: relevant value (may be T or F)reserving_trip_obstruction: falsemutual: falsegroup_largest_pickup_overlap_gap: relevant value (applicable if they do not proper match all choice TG members)group_largest_destination_overlap_gap: relevant value (applicable if they do not proper match all choice TG members)unknown_trip_obstruction: relevant valuetotal_seat_count: choice TG total_seat_count + NPT’s seat_count +++In each of their matched trips array field, delete the element containing the NPT</y:Label.Text></data></node>
+		<node id="n44">
+			<data key="d4"><y:Label.Text>From the NPT’s newly obstructed matched trips (excluding choice TG members) with mutual as true, get the ones that had only the NPT in their matched_trip array</y:Label.Text></data></node>
+		<node id="n45">
+			<data key="d4"><y:Label.Text>All the NPT’s newly obstructed matched trips (excluding choice TG members) with mutual as true that had only the NPT in their matched_trip array documents updates:status: unmatched</y:Label.Text></data></node>
+		<node id="n46">
+			<data key="d4"><y:Label.Text>NPT document update:In it’s matched_trips array field,update all the elements containing the newly obstructed matched trips (with mutual as true)mutual: false</y:Label.Text></data></node>
+		<node id="n47">
+			<data key="d4"><y:Label.Text>Rest of NPT’s matched_trips (excluding choice TG members) with mutual as true that aren't trip or seat obstructed updates:In each of their matched_trips array field update the index containing the NPTpaid: truetrip_group_id: NPT’s new TG ID</y:Label.Text></data></node>
+		<node id="n48">
+			<data key="d4"><y:Label.Text>Get all NPT’s potential trips with mutual as false, go over them and find the ones who do not proper match all the members of the choice TG or whose seat_count is greater than 4 - (choice TG total_seat_count + NPT’s seat count)</y:Label.Text></data></node>
+		<node id="n49">
+			<data key="d4"><y:Label.Text>All the newly obstructed potential trip’s (with mutual as false) document updates:Add NPT to each of their potential_trips arraytrip_id: NPT‘s’ IDpaid: truetrip_group_id: NPT’s TG IDpickup_radius: relevant valuedestination_radius: relevant valuepickup_distance: relevant valuedestination_distance: relevant valueproper_match: truetrip_obstruction: relevant value (may be T or F)seat_obstruction: relevant value (may be T or F)reserving_trip_obstruction: falsemutual: truegroup_largest_pickup_overlap_gap: relevant value (applicable if they do not proper match all choice TG members)group_largest_destination_overlap_gap: relevant value (applicable if they do not proper match all choice TG members)unknown_trip_obstruction: relevant valuetotal_seat_count: choice TG total_seat_count + NPT’s seat_count +++In each of their matched_trips array field, delete the element containing the NPT</y:Label.Text></data></node>
+		<node id="n50">
+			<data key="d4"><y:Label.Text>From the NPT’s newly obstructed potential trips with mutual as false, get the ones that had only the NPT in their matched_trip array</y:Label.Text></data></node>
+		<node id="n51">
+			<data key="d4"><y:Label.Text>All the NPT’s newly obstructed potential trips (excluding choice TG members) with mutual as false that had only the NPT in their matched_trip array documents updates:status: unmatched</y:Label.Text></data></node>
+		<node id="n52">
+			<data key="d4"><y:Label.Text>NPT document update:In it’s potential_trips array field,update all the elements containing the newly obstructed potential trips (with mutual as false)mutual: truestatus: unmatched</y:Label.Text></data></node>
+		<node id="n53">
+			<data key="d4"><y:Label.Text>Rest of NPT’s potential trip’s (with mutual as false) that aren't trip or seat obstructed updates:In each of their matched_trips array field update the index containing the NPTpaid: truetrip_group_id: NPT’s new TG ID</y:Label.Text></data></node>
+		<node id="n54">
+			<data key="d4"><y:Label.Text>All NPT’s matched trip’s with mutual as “false” &amp; potential trip’s with mutual as “true” document updates:In each of their potential trips array field, update the element with NPT’s IDpaid: truetrip_group_id: NPT’s reserving trips TG IDtrip_obstruction: trueseat_obstruction: relevant value (check if this potential trip is seat obstructed after adding NPT’s seat count to it’s new TG’s total seat count prior to it’s entry)reserving_trip_obstruction: falsegroup_largest_pickup_overlap_gap: relevant value if applicablegroup_largest_destination_overlap_gap: relevant value if applicableunknown_trip_obstruction: relevant value (if any of NPT’s TG members are unknown the it'll be true)total_seat_count: choice TG total_seat_count + NPT’s seat_count</y:Label.Text></data></node>
+		<node id="n55">
+			<data key="d4"><y:Label.Text>Create variables:newPickupSuggestions = falsenewDestinationSuggestions = falsetimeArrayChanged = falsetripGroupTimeRangeArray = [ ]</y:Label.Text></data></node>
+		<node id="n56">
+			<data key="d4"><y:Label.Text>New TG document will be created which will be the choice TG, NPT will have to wait for other trips to join it.</y:Label.Text></data></node>
+		<node id="n57">
+			<data key="d4"><y:Label.Text>Create new TG documenttrip_group_id: New TG IDtrip_group_members:trip_id: NPT’s Trip IDfirst_name: NPT’s users first namephone_number: NPT’s users numberphoto_url: NPT’s users photo urlseat_count: NPT’s seat countrecent_message: N/Atotal_seat_count: NPT’s seat countpotential_trip_members: (Add all of NPT’s matched and potential trips)trip_id: ID of the potential/matched tripobstructing_trip_members:only applicable if potential/matched does not proper match NPTtrip_id: NPT’s IDpickup_overlap_gap: relevant valuedestination_overlap_gap: relevant valueunknown: falsetrip_obstruction: relevant valueseat_obstruction: falseseat_count: seat count of the potential/matched tripunknown_trip_obstruction: falsepickup_location_suggestions: N/Adestination_suggestions: N/A</y:Label.Text></data></node>
+		<node id="n58">
+			<data key="d4"><y:Label.Text>NPT document update:Update fieldstrip_group_id: choice TG IDtotal_seat_count: NPT’s seat_count</y:Label.Text></data></node>
+		<node id="n59">
+			<data key="d4"><y:Label.Text>Get all NPT’s matched trips with mutual as true and potential trips with mutual as false</y:Label.Text></data></node>
+		<node id="n60">
+			<data key="d4"><y:Label.Text>All NPT’s matched trips with mutual as true and potential trips with mutual as false document updatesIn each of their matched_trips array field update the index containing the NPTpaid: truetrip_group_id: NPT’s new TG ID</y:Label.Text></data></node>
+		<node id="n61">
+			<data key="d4"><y:Label.Text>Get all NPT’s matched trips with mutual as false and potential trips with mutual as true</y:Label.Text></data></node>
+		<node id="n62">
+			<data key="d4"><y:Label.Text>All NPT’s matched trips with mutual as false and potential trips with mutual as true document updatesIn each of their potential trips array field, update the element with NPT’s IDpaid: truetrip_group_id: Choice TG IDtrip_obstruction: truegroup_largest_pickup_overlap_gap: pickup gap between NPT and this matched/potential trip (gap not distance) +++group_largest_destination_overlap_gap: destination gap between NPT and this matched/potential trip (gap not distance) +++total_seat_count: NPT’s seat_count +++</y:Label.Text></data></node>
+		<node id="n63">
+			<data key="d4"><y:Label.Text>From NPT’s matched trips, get the trip in which it has the nearest combined pickup and destination distance from. This trip will be reserved by NTP.</y:Label.Text></data></node>
+		<node id="n64">
+			<data key="d4"><y:Label.Text>Are there more than 1 matched trip that have the nearest distance from NPT?</y:Label.Text></data></node>
+		<node id="n65">
+			<data key="d4"><y:Label.Text>Randomly pick one of them to be the trip NPT reserves</y:Label.Text></data></node>
+		<node id="n66">
+			<data key="d4"><y:Label.Text>Newly reserved trip document updatereserved: truereserving_trip_id: NPT’s ID</y:Label.Text></data></node>
+		<node id="n67">
+			<data key="d4"><y:Label.Text>NPT document update:In its matched_trips array update the element containing the newly reserved tripreserving: true</y:Label.Text></data></node>
+		<node id="n68">
+			<data key="d4"><y:Label.Text>Get all the Newly Reserved Trip’s (matched trips with mutual as true and potential trips with mutual and false) that do not proper match the NPT. Meaning they're neither in NPT’s matched trips array with mutual as true nor in NPT’s potential trips with mutual as false.</y:Label.Text></data></node>
+		<node id="n69">
+			<data key="d4"><y:Label.Text>All the Newly Reserved Trip’s (matched trips with mutual as true and potential trips with mutual and false) that do not proper match the NPT document updatesIn each of their matched trips array, delete the element containing the newly reserved tripAdd the newly reserved trip to each of their potential trips arraystrip_id: The newly reserved trip’s IDpaid: false ***trip_group_id: N/A ***pickup_radius: relevant valuedestination_radius: relevant valuepickup_distance: relevant valuedestination_distance: relevant valueproper_match: truetrip_obstruction: falseseat_obstruction: falsereserving_trip_obstruction: truemutual: opposite of the mutual value of the deleted matched trips element above containing NPTgroup_largest_pickup_overlap_gap: N/Agroup_largest_destination_overlap_gap: N/Aunknown_trip_obstruction: false</y:Label.Text></data></node>
+		<node id="n70">
+			<data key="d4"><y:Label.Text>Newly reserved trip document update:In it’s potential trips/matched trips array, update all the elements that contain the Newly Reserved Trip’s (matched trips with mutual as true and potential trips with mutual and false) that do not proper match the NPTmutual: opposite of the current value</y:Label.Text></data></node>
+		<node id="n71">
+			<data key="d4"><y:Label.Text>From the Newly Reserved Trip’s (matched trips with mutual as true and potential trips with mutual and false) that do not proper match the NPT, get the one’s that had only the newly reserved trip in their matched_trips array</y:Label.Text></data></node>
+		<node id="n72">
+			<data key="d4"><y:Label.Text>All the Newly Reserved Trip’s (matched trips with mutual as true and potential trips with mutual and false) that do not proper match the NPT, that had only the newly reserved trip in their matched_trips array document updatesIn each of them update their status to unmatchedstatus: unmatched</y:Label.Text></data></node>
+		<node id="n73">
+			<data key="d4"><y:Label.Text>Get all the Newly Reserved Trip’s (matched trips with mutual as false and potential trips with mutual and true) that do not proper match the NPT. Meaning they're neither in NPT’s matched trips array with mutual as true nor in NPT’s potential trips with mutual as false.</y:Label.Text></data></node>
+		<node id="n74">
+			<data key="d4"><y:Label.Text>All the Newly Reserved Trip’s (matched trips with mutual as false and potential trips with mutual and true) that do not proper match the NPT document updatesIn each of their matched trips array, update the reserving_trip_obstruction fieldreserving_trip_obstruction: true</y:Label.Text></data></node>
+		<node id="n75">
+			<data key="d4"><y:Label.Text>End</y:Label.Text></data></node>
+		<node id="n76">
+			<data key="d4"><y:Label.Text>Does the NPT have the same pickup_latlng with any member of the choice TG?</y:Label.Text></data></node>
+		<node id="n77">
+			<data key="d4"><y:Label.Text>Choice trip group document update:In it’s pickup_location_suggestions field update all the distances_from_trip_pickup_locations properties of all elementsdistances_from_trip_pickup_locations (add element) :trip_id: NPT’s trip ID walking_distance: Distance between this location suggestion and the trip group member that NPT has the same pickup_location_description with</y:Label.Text></data></node>
+		<node id="n78">
+			<data key="d4"><y:Label.Text>Number of trip group members in the choice TG &gt; 1?</y:Label.Text></data></node>
+		<node id="n79">
+			<data key="d4"><y:Label.Text>Choice trip group document updateIn it’s pickup_location_suggestions field add new elementpickup_suggestion_name: NPT’s pickup_short_descriptionpickup_suggestion_address: NPT’s pickup_addresspickup_suggestion_location: NPT’s pickup_latlngdistances_from_trip_pickup_locations (add two elements):First: trip_id: NPT’s trip IDwalking_distance: 0Second:trip_id: Sole trip group member’s trip IDwalking_distance: 0</y:Label.Text></data></node>
+		<node id="n80">
+			<data key="d4"><y:Label.Text>newPickupSuggestions = true</y:Label.Text></data></node>
+		<node id="n81">
+			<data key="d4"><y:Label.Text>newPickupSuggestions = true</y:Label.Text></data></node>
+		<node id="n82">
+			<data key="d4"><y:Label.Text>Number of trip group members in the choice TG prior to NPT’s entry &gt; 1?</y:Label.Text></data></node>
+		<node id="n83">
+			<data key="d4"><y:Label.Text>Place holder for logic that gets the, center and radius for nearby search API to get pickup location suggestions for more than 2 users (including NPT)</y:Label.Text></data></node>
+		<node id="n84">
+			<data key="d4"><y:Label.Text>Place holder for logic that gets the, center and radius for nearby search API to get pickup location suggestions for 2 users (including NPT)</y:Label.Text></data></node>
+		<node id="n85">
+			<data key="d4"><y:Label.Text>Make a nearby search POST API call, having header parameters X-Goog-FieldMask and X-Goog-Api-Key with values as follows:X-Goog-FieldMask: places.displayName,places.formattedAddress,places.locationX-Goog-Api-Key: API keyAnd body parameters excludedPrimaryTypes and locationRestriction, example of a request body:{"excludedPrimaryTypes": ["administrative_area_level_1"],"locationRestriction": {"circle": {"center": {"latitude": resolved location latitude,"longitude": resolved location longitude},"radius":resolved radius}}}See documentation if you need further clarification: &lt;a href="https://developers.google.com/maps/documentation/places/web-service/nearby-search" rel="noopener noreferrer" target="_blank"&gt;https://developers.google.com/maps/documentation/places/web-service/nearby-search&lt;/a&gt;The API results will then give us 20 pickup location suggestions</y:Label.Text></data></node>
+		<node id="n86">
+			<data key="d4"><y:Label.Text>Distance matrix API call to find the distances between the pickup locations and the pickup suggestions, with the pickup locations as origins and the pickup suggestions as destinations.From the results, get the pickup suggestions that fall within the radius of each individual pickup location. The pickup suggestions that do not meet this will be left out.</y:Label.Text></data></node>
+		<node id="n87">
+			<data key="d4"><y:Label.Text>Another distance matrix API call to find the distances between the pickup suggestions and the most central destination, with the pickup suggestions as origins and the most central destination as destinations.To find the most central destination:&lt;ol&gt;List the distances: For each user’s destination, find the driving distance to every other user’s destination. We already have this distances from our matching process.Find the worst-case distance: For each user’s destination, look at all the distances to the others and pick the biggest one. This is how far that destination is from the farthest user.Pick the smallest worst-case: Compare those biggest distances across all users. Choose the destination where this biggest distance is the smallest. That’s your most central destination.&lt;/ol&gt;Order the pickup suggestions from the closest to the most central trip destination to the farthest.</y:Label.Text></data></node>
+		<node id="n88">
+			<data key="d4"><y:Label.Text>Choice trip group document updateIn it’s pickup_location_suggestions field add new elementspickup_location_suggestions (add the top 3 after sort):pickup_suggestion_name: relevant valuepickup_suggestion_address: relevant valuepickup_suggestion_location: relevant valuedistances_from_trip_pickup_locations:trip_id: relevant valuewalking_distance: relevant value</y:Label.Text></data></node>
+		<node id="n89">
+			<data key="d4"><y:Label.Text>Does the NPT have the same destination_latlng with any member of the choice TG?</y:Label.Text></data></node>
+		<node id="n90">
+			<data key="d4"><y:Label.Text>Number of trip group members in the choice TG &gt; 1?</y:Label.Text></data></node>
+		<node id="n91">
+			<data key="d4"><y:Label.Text>Choice trip group document updateIn it’s destination_location_suggestions field add new elementdestination_suggestion_name: NPT’s pickup_short_descriptiondestination_suggestion_address: NPT’s pickup_addressdestination_suggestion_location: NPT’s pickup_latlngdistances_from_trip_destinations (add two elements):First: trip_id: NPT’s trip IDwalking_distance: 0Second:trip_id: Sole trip group member’s trip IDwalking_distance: 0</y:Label.Text></data></node>
+		<node id="n92">
+			<data key="d4"><y:Label.Text>Choice trip group document update:In it’s destination_suggestions field update all the distances_from_trip_destination properties of all elementsdistances_from_trip_destinations (add element) :trip_id: NPT’s trip ID walking_distance: Distance between this location suggestion and the trip group member that NPT has the same destination_description with</y:Label.Text></data></node>
+		<node id="n93">
+			<data key="d4"><y:Label.Text>newDestinationSuggestions = true</y:Label.Text></data></node>
+		<node id="n94">
+			<data key="d4"><y:Label.Text>newDestinationSuggestions = true</y:Label.Text></data></node>
+		<node id="n95">
+			<data key="d4"><y:Label.Text>Number of trip group members in the choice TG &gt; 1?</y:Label.Text></data></node>
+		<node id="n96">
+			<data key="d4"><y:Label.Text>Place holder for logic (from the grok chat) that gets the, center and radius for nearby search API to get destination suggestions for 2 users (including NPT)</y:Label.Text></data></node>
+		<node id="n97">
+			<data key="d4"><y:Label.Text>Place holder for logic (from the grok chat) that gets the, center and radius for nearby search API to get destination suggestions for more than 2 users (including NPT)</y:Label.Text></data></node>
+		<node id="n98">
+			<data key="d4"><y:Label.Text>Choice trip group document updateIn it’s destination_suggestions field add new elementsdestination_suggestions (add the top 3 after sort):destination_suggestion_name: relevant valuedestination_suggestion_address: relevant valuedestination_suggestion_location: relevant valuedistances_from_trip_destination_locations:trip_id: relevant valuewalking_distance: relevant value</y:Label.Text></data></node>
+		<node id="n99">
+			<data key="d4"><y:Label.Text>Another distance matrix API call to find the distances between the most central pickup location and the destination suggestions, with the most central pickup location as origins and the destination suggestions as destinations.To find the most central pickup location:&lt;ol&gt;List the distances: For each user’s pickup location, find the driving distance to every other user’s pickup location. We already have this distances from our matching process.Find the worst-case distance: For each user’s pickup location, look at all the distances to the others and pick the biggest one. This is how far that pickup location is from the farthest user.Pick the smallest worst-case: Compare those biggest distances across all users. Choose the pickup location where this biggest distance is the smallest. That’s your most central pickup location.&lt;/ol&gt;Order the destination suggestions from the closest to the most central pickup location to the farthest.</y:Label.Text></data></node>
+		<node id="n100">
+			<data key="d4"><y:Label.Text>Distance matrix API call to find the distances between the destination suggestions and the destination, with the destination suggestions as origins and the destinations as destinations.From the results, get the destination suggestions that fall within the radius of each individual destination. The destination suggestions that do not meet this will be left out.</y:Label.Text></data></node>
+		<node id="n101">
+			<data key="d4"><y:Label.Text>Make a nearby search POST API calls, having header parameters X-Goog-FieldMask and X-Goog-Api-Key with values as follows:X-Goog-FieldMask: places.displayName,places.formattedAddress,places.locationX-Goog-Api-Key: API keyAnd body parameters excludedPrimaryTypes and locationRestriction, example of a request body:{"excludedPrimaryTypes": ["administrative_area_level_1"],"locationRestriction": {"circle": {"center": {"latitude": resolved location latitude,"longitude": resolved location longitude},"radius":resolved radius}}}See documentation if you need further clarification: &lt;a href="https://developers.google.com/maps/documentation/places/web-service/nearby-search" rel="noopener noreferrer" target="_blank"&gt;https://developers.google.com/maps/documentation/places/web-service/nearby-search&lt;/a&gt;The API results will then give us 20 destination suggestions</y:Label.Text></data></node>
+		<node id="n102">
+			<data key="d4"><y:Label.Text>i</y:Label.Text></data></node>
+		<node id="n103">
+			<data key="d4"><y:Label.Text>Length of array union of the time_range_array field of all members of choice trip group prior to NPT entry &gt; Length of array union of the time_range_array field of all members of choice trip group including the NPT?</y:Label.Text></data></node>
+		<node id="n104">
+			<data key="d4"><y:Label.Text>Create new messages subcollection document under choice TG:message: “[NPT user name] joined the trip group”system_message: truetime_stamp: current timenew_pickup_suggestions: newPickupSuggestionsnew_destination_suggestions: newDestinationSuggestionsgroup_time_range_array_changed: timeRangeArrayChangednewly_paid_trip_ref: NPT user refgroup_time_range_array: tripGroupTimeRangeArray</y:Label.Text></data></node>
+		<node id="n105">
+			<data key="d4"><y:Label.Text>Change all the date time strings in the Array union of the time_range_array field of all members of choice trip group including the NPT to 12hr format time strings. E.g. an element "2024-12-09 20:00:00.000" will be “8:00 PM”If any of the time elements is not the same day as the first element in the union, indicate “(Next day)” next to it. e.g a unoin of [ "2024-12-09 23:30:00.000", "2024-12 10 00:00:00.000", "2024-12 10 00:30:00.000"] will be [11:30 PM, 12:00 AM (Next Day), 12:30 AM (Next day)]tripGroupTimeRangeArray = the12hr format time string array union</y:Label.Text></data></node>
+		<node id="n106">
+			<data key="d4"><y:Label.Text>timeRangeArrayChanged = true</y:Label.Text></data></node>
+		<node id="n107">
+			<data key="d4"><y:Label.Text>!newPickupSuggestions AND !newDestinationSuggestions AND !timeRangeArrayChanged?</y:Label.Text></data></node>
+		<node id="n108">
+			<data key="d4"><y:Label.Text>Notification placeholderPlaceholder for notification to all remaining TG members, will be implemented latermessage: “[NPT user’s name] just joined your trip group.Tap to see details!”</y:Label.Text></data></node>
+		<node id="n109">
+			<data key="d4"><y:Label.Text>!newPickupSuggestions AND !newDestinationSuggestions AND timeRangeArrayChanged?</y:Label.Text></data></node>
+		<node id="n110">
+			<data key="d4"><y:Label.Text>tripGroupTimeRangeArray &gt; 1?</y:Label.Text></data></node>
+		<node id="n111">
+			<data key="d4"><y:Label.Text>Notification placeholderPlaceholder for notification to all remaining TG members, will be implemented latermessage: “[NPT user’s name] just joined your trip group. Trip departure time is now set for [first element of tripGroupTimeRangeArray]. Tap to see details!”</y:Label.Text></data></node>
+		<node id="n112">
+			<data key="d4"><y:Label.Text>Notification placeholderPlaceholder for notification to all remaining TG members, will be implemented latermessage: “[NPT user’s name] just joined your trip group. Trip departure time is now set for [first element of tripGroupTimeRangeArray] - [last element of tripGroupTimeRangeArray]. Tap to see details!”</y:Label.Text></data></node>
+		<node id="n113">
+			<data key="d4"><y:Label.Text>!newPickupSuggestions AND newDestinationSuggestions AND !timeRangeArrayChanged?</y:Label.Text></data></node>
+		<node id="n114">
+			<data key="d4"><y:Label.Text>Notification placeholderPlaceholder for notification to all remaining TG members, will be implemented latermessage: “[NPT user’s name] just joined your trip group. New drop-off suggestions to vote on. Tap to see details!”</y:Label.Text></data></node>
+		<node id="n115">
+			<data key="d4"><y:Label.Text>!newPickupSuggestions AND newDestinationSuggestions AND timeRangeArrayChanged?</y:Label.Text></data></node>
+		<node id="n116">
+			<data key="d4"><y:Label.Text>tripGroupTimeRangeArray &gt; 1?</y:Label.Text></data></node>
+		<node id="n117">
+			<data key="d4"><y:Label.Text>Notification placeholderPlaceholder for notification to all remaining TG members, will be implemented latermessage: “[NPT user’s name] just joined your trip group. New drop-off suggestions to vote on. Trip departure time is now set for [first element of tripGroupTimeRangeArray]. Tap to see details!”</y:Label.Text></data></node>
+		<node id="n118">
+			<data key="d4"><y:Label.Text>Notification placeholderPlaceholder for notification to all remaining TG members, will be implemented latermessage: “[NPT user’s name] just joined your trip group. New drop-off suggestions to vote on. Trip departure time is now set for [first element of tripGroupTimeRangeArray] - [last element of tripGroupTimeRangeArray]. Tap to see details!”</y:Label.Text></data></node>
+		<node id="n119">
+			<data key="d4"><y:Label.Text>newPickupSuggestions AND !newDestinationSuggestions AND !timeRangeArrayChanged?</y:Label.Text></data></node>
+		<node id="n120">
+			<data key="d4"><y:Label.Text>Notification placeholderPlaceholder for notification to all remaining TG members, will be implemented latermessage: “[NPT user’s name] just joined your trip group. New meetup suggestions to vote on. Tap to see details!”</y:Label.Text></data></node>
+		<node id="n121">
+			<data key="d4"><y:Label.Text>newPickupSuggestions AND !newDestinationSuggestions AND timeRangeArrayChanged?</y:Label.Text></data></node>
+		<node id="n122">
+			<data key="d4"><y:Label.Text>tripGroupTimeRangeArray &gt; 1?</y:Label.Text></data></node>
+		<node id="n123">
+			<data key="d4"><y:Label.Text>Notification placeholderPlaceholder for notification to all remaining TG members, will be implemented latermessage: “[NPT user’s name] just joined your trip group. New meetup suggestions to vote on. Trip departure time is now set for [last element of tripGroupTimeRangeArray]. Tap to see details!”</y:Label.Text></data></node>
+		<node id="n124">
+			<data key="d4"><y:Label.Text>Notification placeholderPlaceholder for notification to all remaining TG members, will be implemented latermessage: “[NPT user’s name] just joined your trip group. New meetup suggestions to vote on. Trip departure time is now set for [first element of tripGroupTimeRangeArray] - [last element of tripGroupTimeRangeArray]. Tap to see details!”</y:Label.Text></data></node>
+		<node id="n125">
+			<data key="d4"><y:Label.Text>newPickupSuggestions AND newDestinationSuggestions AND !timeRangeArrayChanged?</y:Label.Text></data></node>
+		<node id="n126">
+			<data key="d4"><y:Label.Text>Notification placeholderPlaceholder for notification to all remaining TG members, will be implemented latermessage: “[NPT user’s name] just joined your trip group. New meetup and drop-off suggestions to vote on. Tap to see details!”</y:Label.Text></data></node>
+		<node id="n127">
+			<data key="d4"><y:Label.Text>tripGroupTimeRangeArray &gt; 1?</y:Label.Text></data></node>
+		<node id="n128">
+			<data key="d4"><y:Label.Text>Notification placeholderPlaceholder for notification to all remaining TG members, will be implemented latermessage: “[NPT user’s name] just joined your trip group. New meetup and drop-off suggestions to vote on. Trip departure time is now set for [first element of tripGroupTimeRangeArray] - [last element of tripGroupTimeRangeArray]. Tap to see details!”</y:Label.Text></data></node>
+		<node id="n129">
+			<data key="d4"><y:Label.Text>Notification placeholderPlaceholder for notification to all remaining TG members, will be implemented latermessage: “[NPT user’s name] just joined your trip group. New meetup and drop-off suggestions to vote on. Trip departure time is now set for [last element of tripGroupTimeRangeArray]. Tap to see details!”</y:Label.Text></data></node>
+		<edge id="e0" source="n0" target="n1">
+			</edge>
+		<edge id="e1" source="n1" target="n2">
+			</edge>
+		<edge id="e2" source="n2" target="n3">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e3" source="n3" target="n4">
+			</edge>
+		<edge id="e4" source="n4" target="n5">
+			</edge>
+		<edge id="e5" source="n2" target="n6">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e6" source="n6" target="n8">
+			</edge>
+		<edge id="e7" source="n8" target="n7">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e8" source="n7" target="n9">
+			</edge>
+		<edge id="e9" source="n9" target="n10">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e10" source="n10" target="n11">
+			</edge>
+		<edge id="e11" source="n11" target="n12">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e12" source="n12" target="n13">
+			</edge>
+		<edge id="e13" source="n13" target="n14">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e14" source="n14" target="n15">
+			</edge>
+		<edge id="e15" source="n15" target="n16">
+			</edge>
+		<edge id="e16" source="n16" target="n17">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e17" source="n17" target="n18">
+			</edge>
+		<edge id="e18" source="n18" target="n19">
+			</edge>
+		<edge id="e19" source="n19" target="n20">
+			</edge>
+		<edge id="e20" source="n20" target="n21">
+			</edge>
+		<edge id="e21" source="n21" target="n22">
+			</edge>
+		<edge id="e22" source="n22" target="n23">
+			</edge>
+		<edge id="e23" source="n23" target="n24">
+			</edge>
+		<edge id="e24" source="n24" target="n25">
+			</edge>
+		<edge id="e25" source="n25" target="n26">
+			</edge>
+		<edge id="e26" source="n26" target="n27">
+			</edge>
+		<edge id="e27" source="n27" target="n28">
+			</edge>
+		<edge id="e28" source="n28" target="n29">
+			</edge>
+		<edge id="e29" source="n29" target="n31">
+			</edge>
+		<edge id="e30" source="n31" target="n30">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e31" source="n30" target="n32">
+			</edge>
+		<edge id="e32" source="n32" target="n33">
+			</edge>
+		<edge id="e33" source="n33" target="n34">
+			</edge>
+		<edge id="e34" source="n34" target="n35">
+			</edge>
+		<edge id="e35" source="n35" target="n36">
+			</edge>
+		<edge id="e36" source="n36" target="n37">
+			</edge>
+		<edge id="e37" source="n37" target="n38">
+			</edge>
+		<edge id="e38" source="n38" target="n39">
+			</edge>
+		<edge id="e39" source="n39" target="n40">
+			</edge>
+		<edge id="e40" source="n40" target="n41">
+			</edge>
+		<edge id="e41" source="n41" target="n42">
+			</edge>
+		<edge id="e42" source="n42" target="n43">
+			</edge>
+		<edge id="e43" source="n43" target="n44">
+			</edge>
+		<edge id="e44" source="n44" target="n45">
+			</edge>
+		<edge id="e45" source="n45" target="n46">
+			</edge>
+		<edge id="e46" source="n46" target="n47">
+			</edge>
+		<edge id="e47" source="n47" target="n48">
+			</edge>
+		<edge id="e48" source="n48" target="n49">
+			</edge>
+		<edge id="e49" source="n49" target="n50">
+			</edge>
+		<edge id="e50" source="n50" target="n51">
+			</edge>
+		<edge id="e51" source="n51" target="n52">
+			</edge>
+		<edge id="e52" source="n52" target="n53">
+			</edge>
+		<edge id="e53" source="n53" target="n54">
+			</edge>
+		<edge id="e54" source="n54" target="n55">
+			</edge>
+		<edge id="e55" source="n31" target="n32">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e56" source="n16" target="n25">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e57" source="n5" target="n26">
+			</edge>
+		<edge id="e58" source="n9" target="n15">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e59" source="n8" target="n56">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e60" source="n56" target="n57">
+			</edge>
+		<edge id="e61" source="n57" target="n58">
+			</edge>
+		<edge id="e62" source="n58" target="n59">
+			</edge>
+		<edge id="e63" source="n59" target="n60">
+			</edge>
+		<edge id="e64" source="n60" target="n61">
+			</edge>
+		<edge id="e65" source="n61" target="n62">
+			</edge>
+		<edge id="e66" source="n62" target="n63">
+			</edge>
+		<edge id="e67" source="n63" target="n64">
+			</edge>
+		<edge id="e68" source="n64" target="n65">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e69" source="n65" target="n66">
+			</edge>
+		<edge id="e70" source="n66" target="n67">
+			</edge>
+		<edge id="e71" source="n67" target="n68">
+			</edge>
+		<edge id="e72" source="n68" target="n69">
+			</edge>
+		<edge id="e73" source="n69" target="n70">
+			</edge>
+		<edge id="e74" source="n70" target="n71">
+			</edge>
+		<edge id="e75" source="n71" target="n72">
+			</edge>
+		<edge id="e76" source="n72" target="n73">
+			</edge>
+		<edge id="e77" source="n73" target="n74">
+			</edge>
+		<edge id="e78" source="n74" target="n75">
+			</edge>
+		<edge id="e79" source="n64" target="n66">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e80" source="n55" target="n76">
+			</edge>
+		<edge id="e81" source="n76" target="n78">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e82" source="n78" target="n77">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e83" source="n78" target="n79">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e84" source="n79" target="n80">
+			</edge>
+		<edge id="e85" source="n76" target="n81">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e86" source="n81" target="n82">
+			</edge>
+		<edge id="e87" source="n77" target="n89">
+			</edge>
+		<edge id="e88" source="n82" target="n83">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e89" source="n80" target="n89">
+			</edge>
+		<edge id="e90" source="n82" target="n84">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e91" source="n83" target="n85">
+			</edge>
+		<edge id="e92" source="n84" target="n85">
+			</edge>
+		<edge id="e93" source="n85" target="n86">
+			</edge>
+		<edge id="e94" source="n86" target="n87">
+			</edge>
+		<edge id="e95" source="n87" target="n88">
+			</edge>
+		<edge id="e96" source="n88" target="n89">
+			</edge>
+		<edge id="e97" source="n89" target="n90">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e98" source="n89" target="n94">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e99" source="n90" target="n91">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e100" source="n90" target="n92">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e101" source="n91" target="n93">
+			</edge>
+		<edge id="e102" source="n94" target="n95">
+			</edge>
+		<edge id="e103" source="n95" target="n96">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e104" source="n95" target="n97">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e105" source="n92" target="n102">
+			</edge>
+		<edge id="e106" source="n93" target="n102">
+			</edge>
+		<edge id="e107" source="n97" target="n101">
+			</edge>
+		<edge id="e108" source="n96" target="n101">
+			</edge>
+		<edge id="e109" source="n101" target="n100">
+			</edge>
+		<edge id="e110" source="n100" target="n99">
+			</edge>
+		<edge id="e111" source="n99" target="n98">
+			</edge>
+		<edge id="e112" source="n98" target="n102">
+			</edge>
+		<edge id="e113" source="n102" target="n103">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e114" source="n103" target="n106">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e115" source="n102" target="n107">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e116" source="n103" target="n104">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e117" source="n106" target="n105">
+			</edge>
+		<edge id="e118" source="n105" target="n104">
+			</edge>
+		<edge id="e119" source="n104" target="n107">
+			</edge>
+		<edge id="e120" source="n107" target="n108">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e121" source="n107" target="n109">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e122" source="n108" target="n109">
+			</edge>
+		<edge id="e123" source="n109" target="n110">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e124" source="n110" target="n111">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e125" source="n110" target="n112">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e126" source="n112" target="n113">
+			</edge>
+		<edge id="e127" source="n109" target="n113">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e128" source="n111" target="n113">
+			</edge>
+		<edge id="e129" source="n113" target="n114">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e130" source="n114" target="n115">
+			</edge>
+		<edge id="e131" source="n115" target="n116">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e132" source="n115" target="n117">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e133" source="n116" target="n118">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e134" source="n118" target="n119">
+			</edge>
+		<edge id="e135" source="n113" target="n119">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e136" source="n116" target="n117">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e137" source="n119" target="n120">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e138" source="n119" target="n121">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e139" source="n120" target="n121">
+			</edge>
+		<edge id="e140" source="n121" target="n122">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e141" source="n121" target="n125">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e142" source="n122" target="n124">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e143" source="n122" target="n123">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e144" source="n124" target="n125">
+			</edge>
+		<edge id="e145" source="n123" target="n125">
+			</edge>
+		<edge id="e146" source="n125" target="n126">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e147" source="n126" target="n127">
+			</edge>
+		<edge id="e148" source="n127" target="n129">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e149" source="n127" target="n128">
+			<data key="d11"><y:Label.Text>Yes</y:Label.Text></data></edge>
+		<edge id="e150" source="n125" target="n127">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e151" source="n128" target="n75">
+			</edge>
+		<edge id="e152" source="n129" target="n75">
+			</edge>
+		<edge id="e153" source="n13" target="n15">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e154" source="n11" target="n15">
+			<data key="d11"><y:Label.Text>No</y:Label.Text></data></edge>
+		<edge id="e155" source="n117" target="n119">
+			</edge>
+	</graph>
+</graphml>

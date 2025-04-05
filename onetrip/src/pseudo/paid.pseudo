@@ -1,0 +1,785 @@
+START
+
+// Initial Setup and NPT Status Update
+SET NPT.status = "paid"
+
+// Check if NPT is Reserved
+IF NPT.reserved == true THEN
+    // NPT is reserving another trip
+    choice_trip_group = NPT.reserving_trip.trip_group
+
+    // Update NPT Document
+    NPT.trip_group_id = choice_trip_group.ID
+    NPT.total_seat_count = choice_trip_group.total_seat_count + NPT.seat_count
+    NPT.reserved = false
+    DELETE NPT.reserving_trip_id
+
+     // Update NPT's reserving trip's document
+    NPT.reserving_trip.total_seat_count = choice_trip_group.total_seat_count + NPT.seat_count
+   
+    //Update the element in reserving trip's matched_trips containing NPT
+    UPDATE reserving_trip.matched_trips[NPT]
+    SET reserving_trip.matched_trips[NPT].total_seat_count =  choice_trip_group.total_seat_count + NPT.seat_count
+    SET reserving_trip.matched_trips[NPT].paid = true
+    SET reserving_trip.matched_trips[NPT].trip_group_id = choice_trip_group.ID
+    SET reserving_trip.matched_trips[NPT].reserving = false
+
+ELSE:
+    // NPT is not reserving another trip
+    // Get NPT's Matched Trips
+    matched_trips = GET NPT.matched_trips
+
+    // Check for Paid Matched Trips
+    paid_matched_trips = FILTER matched_trips WHERE status == "paid"
+
+    IF paid_matched_trips.length > 0 THEN
+        // Extract Distinct Trip Groups
+        distinct_trip_groups = GET DISTINCT trip_group_id FROM paid_matched_trips
+
+        IF distinct_trip_groups.length == 1 THEN
+            // Only one trip group, it's the choice
+            choice_trip_group = distinct_trip_groups[0]
+
+              // Update NPT Document
+                NPT.trip_group_id = choice_trip_group.ID
+                NPT.total_seat_count = choice_trip_group.total_seat_count + NPT.seat_count
+
+                IF choice_trip_group.members.length == 1 THEN
+                    // Sole Trip Group Member Logic
+                   sole_member = choice_trip_group.members[0]
+                   reserving_trip = GET sole_member.trip.matched_trips WHERE reserving == true
+
+                    //Update sole member
+                   UPDATE sole_member.trip.matched_trips[reserving_trip]
+                   SET sole_member.trip.matched_trips[reserving_trip].reserving = false
+
+                   //Update trip being reserved by sole member
+                   reserving_trip.reserved = false
+                   DELETE reserving_trip.reserving_trip_id
+
+                //   // From reserving trip, get all matched trips with mutual as true and
+                // potential trips with mutual as false
+                  mutual_matched_trips = GET reserving_trip.matched_trips WHERE mutual == true
+                  non_mutual_potential_trips = GET reserving_trip.potential_trips WHERE mutual == false
+                  
+                  combined_trips = mutual_matched_trips + non_mutual_potential_trips
+
+                //   // Get trips that have reserving_trip_obstruction and proper_match
+                // reserving_trip_obstruction_trips = []
+                // proper_match_reserving_trip_obstruction_trips = []
+
+                   FOR each trip IN combined_trips.potential_trips
+                        index = FIND INDEX of reserving_trip IN trip.potential_trips
+                        IF trip.potential_trips[index].reserving_trip_obstruction == true AND trip.potential_trips[index].proper_match == false THEN
+                            ADD trip TO reserving_trip_obstruction_trips
+                        ELSE IF trip.potential_trips[index].reserving_trip_obstruction == true AND trip.potential_trips[index].proper_match == true THEN
+                            ADD trip to proper_match_reserving_trip_obstruction_trips
+                       ENDIF
+                   ENDFOR
+
+                   //Update all the trips in reserving_trip_obstruction_trips
+                   FOR each trip IN reserving_trip_obstruction_trips
+                        UPDATE trip.potential_trips[index] //index of reserving trip
+                        SET trip.potential_trips[index].reserving_trip_obstruction = false
+                   ENDFOR
+
+                   //Update all the trips in proper_match_reserving_trip_obstruction_trips
+                    FOR each trip in proper_match_reserving_trip_obstruction_trips
+                        //delete reserving trip from potential trips
+                        DELETE reserving_trip FROM trip.potential_trips
+                       
+                        //add reserving trip to matched trips
+                        ADD reserving_trip TO trip.matched_trips WITH following keys
+                       // trip_id﻿: The trip that sole trip member was reserving’s ID
+                        // trip_group_id: N/A
+                        // paid﻿: false
+                        // pickup_radius: relevant value
+                        // ﻿destination_radius: relevant value
+                        // pickup_distance: relevant value
+                        // destination_distance: relevant value
+                       // mutual: If this trip was in the trip that sole trip member was reserving’s matched trip array then true, else false
+                        // reserving: false
+                    ENDFOR
+
+                    //Update reserving trip document
+                  FOR each trip IN reserving_trip.matched_trips
+                      IF trip.mutual == false AND trip.proper_match == true
+                        UPDATE trip
+                        SET trip.mutual = true
+                      ENDIF
+                  ENDFOR
+
+                  FOR each trip IN reserving_trip.potential_trips
+                    IF trip.mutual == true AND trip.proper_match == true
+                        UPDATE trip
+                        SET trip.mutual = false
+                    ENDIF
+                  ENDFOR
+                
+                ELSE
+                    // Choice TG has more than one member.
+
+                ENDIF // End of "sole member" check
+
+        ELSE
+                // More than one distinct trip group
+                // Find Trip Group with Least Trips
+                smallest_trip_group = FIND MINIMUM trip_group IN distinct_trip_groups BY trip_count
+
+                // Check for multiple groups with the same minimum count
+                least_trips_groups = FILTER distinct_trip_groups WHERE trip_count == smallest_trip_group.trip_count
+
+                 IF least_trips_groups.length > 1 THEN
+                   //Multiple groups with least trips
+                     // Find group with least total distance
+                    choice_trip_group = FIND MINIMUM trip_group IN least_trips_groups
+                                        BY (total_pickup_distance + total_destination_distance)
+
+                        // Check for multiple groups with the same minimum distance
+                    least_distance_groups = FILTER least_trips_groups
+                                            WHERE (total_pickup_distance + total_destination_distance)
+                                            == choice_trip_group.(total_pickup_distance + total_destination_distance)
+
+                            IF least_distance_groups.length > 1 THEN
+                                // Multiple groups with least distance: Random Selection
+                                choice_trip_group = RANDOM CHOICE FROM least_distance_groups
+                            ELSE
+                                // Least distance group is the choice
+                                // choice_trip_group already set
+                            ENDIF
+
+                 ELSE
+                    //Least trips group is the choice
+                    choice_trip_group = smallest_trip_group
+                ENDIF //End of least_trips_group check
+              
+              // Update NPT Document
+                NPT.trip_group_id = choice_trip_group.ID
+                NPT.total_seat_count = choice_trip_group.total_seat_count + NPT.seat_count
+            
+        ENDIF // End of "more than one distinct trip group" check
+
+    ELSE
+         //No paid matched trips for NPT
+          //Create New Trip Group (TG)
+          new_tg = CREATE NEW TRIP GROUP
+          new_tg.trip_group_id = GENERATE NEW ID
+          ADD NPT AS new_tg.trip_group_members // with relevant fields
+          new_tg.total_seat_count = NPT.seat_count
+          
+        //  Add all of NPT’s matched and potential trips to potential trip members
+
+        FOR each trip IN NPT.matched_trips
+            ADD trip to new_tg.potential_trip_members //WITH relevant values
+         ENDFOR
+          
+          FOR each trip IN NPT.potential_trips
+              ADD trip to new_tg.potential_trip_members //WITH relevant values
+          ENDFOR
+        
+            // Update NPT Document (with new TG)
+            NPT.trip_group_id = new_tg.ID
+            NPT.total_seat_count = NPT.seat_count
+
+             //Get all NPT’s matched trips with mutual as true and potential trips with mutual as false  
+             true_matched_trips = GET NPT.matched_trips WHERE mutual == true
+             false_potential_trips = GET NPT.potential_trips WHERE mutual == false
+           
+            combined_trips = true_matched_trips + false_potential_trips
+
+             FOR each trip IN combined_trips
+                  UPDATE trip.matched_trips[NPT]
+                    SET trip.matched_trips[NPT].paid = true
+                    SET trip.matched_trips[NPT].trip_group_id = new_tg.ID
+            ENDFOR
+
+            //Get all NPT’s matched trips with mutual as false and potential trips with mutual as true 
+             false_matched_trips = GET NPT.matched_trips WHERE mutual == false
+             true_potential_trips = GET NPT.potential_trips WHERE mutual == true
+
+             other_combined_trips = false_matched_trips + true_potential_trips
+             
+             FOR each trip in other_combined_trips
+                  UPDATE trip.potential_trips[NPT]
+                  SET trip.potential_trips[NPT].paid = true
+                  SET trip.potential_trips[NPT].trip_group_id = new_tg.ID
+                  SET trip.potential_trips[NPT].trip_obstruction = true
+                  SET trip.potential_trips[NPT].group_largest_pickup_overlap_gap = CALCULATE PICKUP OVERLAP GAP(trip, NPT) //gap not distance
+                  SET trip.potential_trips[NPT].group_largest_destination_overlap_gap = CALCULATE DESTINATION OVERLAP GAP(trip, NPT) //gap not distance
+                  SET trip.potential_trips[NPT].total_seat_count = NPT.seat_count
+             ENDFOR
+
+             //Find trip to reserve for NPT
+
+            IF NPT.matched_trips.length > 0
+              
+              trip_to_reserve = null
+              min_distance = INFINITY
+
+            FOR each trip in NPT.matched_trips
+                combined_distance = trip.pickup_distance + trip.destination_distance
+                 IF combined_distance < min_distance THEN
+                    min_distance = combined_distance
+                    trip_to_reserve = trip
+                ENDIF
+            ENDFOR
+             
+             //Check for trips with same minimum distance
+             trips_with_min_distance = []
+             FOR each trip in NPT.matched_trips
+                 combined_distance = trip.pickup_distance + trip.destination_distance
+                IF combined_distance == min_distance
+                    ADD trip TO trips_with_min_distance
+                 ENDIF
+              ENDFOR
+               
+               IF trips_with_min_distance.length > 1 THEN
+                    //Multiple trips with same minimum distance, pick randomly
+                     trip_to_reserve = RANDOM CHOICE FROM trips_with_min_distance
+                ENDIF
+
+               // Update Newly Reserved Trip
+                trip_to_reserve.reserved = true
+                trip_to_reserve.reserving_trip_id = NPT.ID
+
+                // Update NPT document
+               UPDATE NPT.matched_trips[trip_to_reserve]
+               SET NPT.matched_trips[trip_to_reserve].reserving = true
+           
+            //    Get all the Newly Reserved Trip’s (matched trips with mutual as true and potential trips with mutual and false) that do not proper match the NPT
+
+               combined_trips = []
+               
+            FOR each trip in trip_to_reserve.matched_trips
+                 IF trip.mutual == true
+                    ADD trip to combined_trips
+                ENDIF
+            ENDFOR
+
+            FOR each trip in trip_to_reserve.potential_trips
+                 IF trip.mutual == false
+                    ADD trip to combined_trips
+                ENDIF
+            ENDFOR
+
+            not_proper_match_trips = []
+
+            FOR each trip in combined_trips
+                 IF NOT (trip IN NPT.matched_trips WITH mutual == true OR trip IN NPT.potential_trips WITH mutual == false)
+                      ADD trip TO not_proper_match_trips
+                ENDIF
+            ENDFOR
+               
+               // Update All the Newly Reserved Trip’s (matched trips with mutual as true and potential trips with mutual and false) that do not proper match the NPT documents
+               FOR each trip in not_proper_match_trips
+                    //Delete the newly reserved trip element
+                     DELETE trip_to_reserve FROM trip.matched_trips
+
+                     // Add the newly reserved trip to each of their potential trips arrays
+                      ADD trip_to_reserve TO trip.potential_trips WITH following keys
+                      // trip_id﻿: The newly reserved trip’s ID
+                        // paid﻿: false ***
+                        // trip_group_id: N/A ***
+                        // pickup_radius: relevant value
+                        // ﻿destination_radius: relevant value
+                        // pickup_distance: relevant value
+                        // destination_distance: relevant value
+                        // proper_match: true
+                        // trip_obstruction: false
+                        // seat_obstruction: false
+                        // reserving_trip_obstruction: true
+                        // mutual: opposite of the mutual value of the deleted matched trips element above containing NPT
+                        // group_largest_pickup_overlap_gap: N/A
+                        // group_largest_destination_overlap_gap: N/A
+                        // unknown_trip_obstruction: false
+               ENDFOR
+
+                 //Update Newly Reserved Trip’s matched and potential trips
+
+                 FOR each trip IN trip_to_reserve.matched_trips + trip_to_reserve.potential_trips
+                    IF trip IN not_proper_match_trips THEN
+                        UPDATE trip
+                        SET trip.mutual =  NOT trip.mutual //Opposite
+                    ENDIF
+                ENDFOR
+
+                //Get the one’s that had only the newly reserved trip in their matched_trips array
+                 
+                 trips_with_one_matched_trip = []
+                 FOR each trip IN not_proper_match_trips
+                    IF trip.matched_trips.length == 1 AND trip.matched_trips[0].trip_id == trip_to_reserve.trip_id THEN
+                          ADD trip TO trips_with_one_matched_trip
+                    ENDIF
+                ENDFOR
+
+                FOR each trip in trips_with_one_matched_trip
+                        SET trip.status = unmatched
+                ENDFOR
+
+                 // From the Newly Reserved Trip’s (matched trips with mutual as true and potential trips with mutual and false) that do not proper match the NPT,
+                 //get the ones that are matched trips with mutual as “false” & potential trips with mutual as “true”
+                  
+                 other_trips = []
+                  FOR each trip in trip_to_reserve.matched_trips
+                    IF trip.mutual == false
+                        ADD trip to other_trips
+                    ENDIF
+                 ENDFOR
+
+                FOR each trip in trip_to_reserve.potential_trips
+                    IF trip.mutual == true
+                        ADD trip to other_trips
+                ENDIF
+            ENDFOR
+                 
+                 //In each of their matched trips array, update the reserving_trip_obstruction field
+                 FOR each trip in other_trips
+                      UPDATE trip.matched_trips
+                      SET trip.matched_trips.reserving_trip_obstruction = true
+                 ENDFOR
+               
+                 // All choice TG members trip documents update:
+                  FOR each member IN choice_trip_group.members
+                  //Update each of their total_seat_count field
+                    member.trip.total_seat_count = choice_trip_group.total_seat_count + NPT.seat_count
+                 
+                 // In each of their matched_trips array field, update the element containing NPT
+                    UPDATE member.trip.matched_trips[NPT]
+                    SET member.trip.matched_trips[NPT].paid = true
+                    SET member.trip.matched_trips[NPT].trip_group_id = choice_trip_group.ID
+
+                 ENDFOR
+
+                 // Choice trip group document update
+                //Update total_seat_count field
+                choice_trip_group.total_seat_count = choice_trip_group.total_seat_count + NPT.seat_count
+
+                //In it’s potential_trip_members field delete the element containing NPT
+                 DELETE NPT FROM choice_trip_group.potential_trip_members
+
+                 //Add new trip_group_members element
+                 ADD NPT to choice_trip_group.trip_group_members WITH THE FOLLOWING KEYS:
+                // trip_id: NPT’s ID
+                // first_name: NPT’s user first name
+                // phone_number﻿: NPT’s user phone_number
+                // photo_url: NPT’s user photo
+                // seat_count: NPT’s user seat_count
+
+                 // In the choice TG’s potential trip members array, get all the trips that are not seat obstructed (seat_obstruction = false), but are now seat obstructed due to NPT’s entry (seat_count is greater than 4 - [reserving trips TG total_seat_count + NPT’s seat count]).
+                 //Remember to exclude the NPT from from among the trips to check in the potential trip members array, as it’s going to be deleted.
+               
+                newly_seat_obstructed_trips = []
+                FOR each trip IN choice_trip_group.potential_trip_members
+                IF trip.trip_id != NPT.trip_id AND trip.seat_obstruction == false
+                     IF trip.seat_count > (4 - (choice_trip_group.total_seat_count_before_npt + NPT.seat_count))
+                         ADD trip TO newly_seat_obstructed_trips
+                    ENDIF
+                ENDIF
+                ENDFOR
+                //Choice trip group document update:
+                 FOR each trip in newly_seat_obstructed_trips
+                      UPDATE choice_trip_group.potential_trip_members[trip] //Update potential members
+                      SET choice_trip_group.potential_trip_members[trip].seat_obstruction = true
+                 ENDFOR
+               
+                
+             ELSE
+                  //No matched trips
+             ENDIF
+    ENDIF  //Endif for paid_matched_trips
+
+ENDIF //Endif for NPT.reserved
+
+
+//Calculate new pickup and destination centroids
+//Calculate the straight line distances between the pickup locations and the pickup centroid
+//Also calculate the straight line distances between the destinations and the destination centroid.
+//Get the pickup location with the farthest straight line distance from the pickup centroid and the destination with the farthest straight line distance from the destination centroid.
+
+//Using the distance matrix API, get the pickup location closest to the destination centroid, also get the destination location closest to the pickup centroid.
+//Do both in one call (to save cost) having the pickup locations and destinations as origins and the both centroids as destinations. Then find the relevant distances from the results.
+
+//Make 2 (one for pickup and one for destination) nearby search POST API calls
+
+//The API results will then give us 20 pickup location suggestions and 20 destination suggestions
+
+//Run another distance matrix API call in order to find the distances between the pickup locations and the pickup suggestions, also the distances between the destinations and the destination suggestions
+
+//From the results, get the pickup suggestions that fall within the radius of each individual pickup location. Also, get the destination suggestions that fall within the radius of each individual destination. The pickup and destination suggestions that do not meet this will be left out.
+
+//From the remaining suggestions using the previous API result, order the pickup suggestions from the closest to the pickup location that’s closest to the destination centroid (which we got earlier) to the farthest. Also, order the destination suggestions from the closest to the destination location that’s closest to the destination centroid (which we got earlier) to the farthest. 
+//Reserving trip’s trip group document update
+//In it’s pickup_location_suggestions and destination_suggestions fields add new elements
+
+END
+
+
+
+
+
+
+
+
+
+
+
+
+          if (distinctTripGroupIds.size === 0) { //n8
+            //same logic with creating a new trip group
+            //n56
+            logger.info("Creating new Trip Group as Choice Trip Group");
+            const newTripGroupRef = db.collection('trip_groups').doc();
+            choiceTripGroupRef = newTripGroupRef;
+            //Create the new Trip Group
+            const newTripGroup: TripGroup = { //n57
+                trip_group_members: [{
+                    trip_ref: nptTripRef,
+                    user_ref: nptTripRef.parent.parent!,
+                    first_name: (await nptTripRef.parent.parent!.get()).data()?.first_name,
+                    last_name: (await nptTripRef.parent.parent!.get()).data()?.last_name,
+                    phone_number: (await nptTripRef.parent.parent!.get()).data()?.phone_number,
+                    photo_url: (await nptTripRef.parent.parent!.get()).data()?.photo_url,
+                    seat_count: nptTrip.seat_count,
+                    joined_timestamp: Timestamp.now(),
+                    last_message_read_id: "",
+                    time_range_array: nptTrip.time_range_array,
+                    arrived: false,
+                    trip_group_leader: true, //first one in
+                    canceled: false,
+                }],
+                recent_message: null,
+                total_seat_count: nptTrip.seat_count,
+                potential_trip_members: [], // Initialize as empty
+                pickup_location_suggestions: [],
+                destination_suggestions: [],
+            };
+
+            const allRelatedTrips = [...nptTrip.matched_trips, ...nptTrip.potential_trips]; //n57
+
+            for (const relatedTrip of allRelatedTrips) {
+              const relatedTripData = (await transaction.get(relatedTrip.trip_ref)).data() as Trip;
+
+              if(!relatedTripData){
+                logger.warn(`Related trip data is null for trip ID: ${relatedTrip.trip_ref.id}, skipping...`);
+                continue;
+              }
+
+              const tripObstruction = !properMatch(nptTrip, relatedTripData);
+              const potentialTripMember: PotentialTripMember = {
+                  trip_ref: relatedTrip.trip_ref,
+                  obstructing_trip_members: tripObstruction ? [{
+                      trip_ref: nptTripRef,
+                      pickup_overlap_gap: tripObstruction ? calculateGap(nptTrip.pickup_latlng, nptTrip.pickup_radius, relatedTripData.pickup_latlng, relatedTripData.pickup_radius, 'pickup').gap : 0,
+                      destination_overlap_gap: tripObstruction ? calculateGap(nptTrip.destination_latlng, nptTrip.destination_radius, relatedTripData.destination_latlng, relatedTripData.destination_radius, 'destination').gap : 0,
+                      unknown: false,
+                  }] : [],
+                  trip_obstruction: tripObstruction,
+                  seat_obstruction: false, // Initially false
+                  seat_count: relatedTrip.seat_count,
+                  unknown_trip_obstruction: false,
+              };
+              newTripGroup.potential_trip_members.push(potentialTripMember);
+          }
+          //end of n57
+
+            transaction.set(newTripGroupRef, newTripGroup);
+             //n58
+            const nptUpdate: Partial<Trip> = {
+                trip_group_ref: newTripGroupRef,
+                total_seat_count: nptTrip.seat_count,
+              };
+            transaction.update(nptTripRef, nptUpdate);
+
+            //n59
+            const matchedTripsMutualTrue = nptTrip.matched_trips.filter(mt => mt.mutual);
+            const potentialTripsMutualFalse = nptTrip.potential_trips.filter(pt => !pt.mutual);
+
+            for(const matchedTrip of matchedTripsMutualTrue){ //n60
+              const matchedTripUpdate: Partial<Trip> = {};
+
+              const matchedTripIndex = (await transaction.get(matchedTrip.trip_ref)).data()?.matched_trips.findIndex(mt => mt.trip_ref.id === nptTrip.trip_id);
+
+              if(matchedTripIndex != -1){
+                matchedTripUpdate[`matched_trips.${matchedTripIndex}.paid`] = true;
+                matchedTripUpdate[`matched_trips.${matchedTripIndex}.trip_group_ref`] = newTripGroupRef
+              }
+
+              transaction.update(matchedTrip.trip_ref, matchedTripUpdate);
+            }
+
+            for(const potentialTrip of potentialTripsMutualFalse){ //n60
+              const potentialTripUpdate: Partial<Trip> = {};
+
+              const potentialTripIndex = (await transaction.get(potentialTrip.trip_ref)).data()?.potential_trips.findIndex(pt => pt.trip_ref.id === nptTrip.trip_id);
+              if(potentialTripIndex != -1){
+                  potentialTripUpdate[`potential_trips.${potentialTripIndex}.paid`] = true;
+                  potentialTripUpdate[`potential_trips.${potentialTripIndex}.trip_group_ref`] = newTripGroupRef;
+              }
+
+              transaction.update(potentialTrip.trip_ref, potentialTripUpdate)
+            }
+            //n61
+            const matchedTripsMutualFalse = nptTrip.matched_trips.filter(mt => !mt.mutual);
+            const potentialTripsMutualTrue = nptTrip.potential_trips.filter(pt => pt.mutual);
+
+            const tripGroupInfos: TripGroupInfo[] = [];
+
+            for(const matchedTrip of matchedTripsMutualFalse){ //n62
+
+              const matchedTripData = (await transaction.get(matchedTrip.trip_ref)).data() as Trip;
+
+              if (!matchedTripData) {
+                  throw new HttpsError("not-found", `Trip data is null for trip ID: ${matchedTrip.trip_ref.id}, skipping...`);
+                }
+
+              const { gap: pickupGap } = calculateGap(nptTrip.pickup_latlng, nptTrip.pickup_radius, matchedTripData.pickup_latlng, matchedTripData.pickup_radius, 'pickup');
+              const { gap: destinationGap } = calculateGap(nptTrip.destination_latlng, nptTrip.destination_radius, matchedTripData.destination_latlng, matchedTripData.destination_radius, 'destination');
+
+              tripGroupInfos.push({
+                tripGroupId: matchedTripData.trip_group_ref.id,
+                tripObstruction: true,
+                seatObstruction: false,
+                largestPickupOverlapGap: pickupGap,
+                largestDestinationOverlapGap: destinationGap,
+              });
+
+              const matchedTripUpdate: Partial<Trip> = {};
+              const matchedTripIndex = matchedTripData.potential_trips.findIndex(pt => pt.trip_ref.id === nptTrip.trip_id);
+              if(matchedTripIndex != -1){
+                matchedTripUpdate[`potential_trips.${matchedTripIndex}.paid`] = true;
+                matchedTripUpdate[`potential_trips.${matchedTripIndex}.trip_group_ref`] = newTripGroupRef;
+                matchedTripUpdate[`potential_trips.${matchedTripIndex}.trip_obstruction`] = true;
+                matchedTripUpdate[`potential_trips.${matchedTripIndex}.group_largest_pickup_overlap_gap`] = pickupGap;
+                matchedTripUpdate[`potential_trips.${matchedTripIndex}.group_largest_destination_overlap_gap`] = destinationGap;
+                matchedTripUpdate[`potential_trips.${matchedTripIndex}.total_seat_count`] = nptTrip.seat_count; //n62 +++
+              }
+              transaction.update(matchedTrip.trip_ref, matchedTripUpdate);
+            }
+
+            for(const potentialTrip of potentialTripsMutualTrue){ //n62
+              const potentialTripData = (await transaction.get(potentialTrip.trip_ref)).data() as Trip;
+              if (!potentialTripData) {
+                  throw new HttpsError("not-found", `Trip data is null for trip ID: ${potentialTrip.trip_ref.id}, skipping...`);
+              }
+
+              const { gap: pickupGap } = calculateGap(nptTrip.pickup_latlng, nptTrip.pickup_radius, potentialTripData.pickup_latlng, potentialTripData.pickup_radius, 'pickup');
+              const { gap: destinationGap } = calculateGap(nptTrip.destination_latlng, nptTrip.destination_radius, potentialTripData.destination_latlng, potentialTripData.destination_radius, 'destination');
+
+              tripGroupInfos.push({
+                tripGroupId: potentialTripData.trip_group_ref.id,
+                tripObstruction: true,
+                seatObstruction: false,
+                largestPickupOverlapGap: pickupGap,
+                largestDestinationOverlapGap: destinationGap,
+              });
+
+
+              const potentialTripUpdate: Partial<Trip> = {};
+              const potentialTripIndex = potentialTripData.potential_trips.findIndex(pt => pt.trip_ref.id === nptTrip.trip_id);
+              if(potentialTripIndex != -1){
+                potentialTripUpdate[`potential_trips.${potentialTripIndex}.paid`] = true;
+                potentialTripUpdate[`potential_trips.${potentialTripIndex}.trip_group_ref`] = newTripGroupRef;
+                potentialTripUpdate[`potential_trips.${potentialTripIndex}.trip_obstruction`] = true;
+                potentialTripUpdate[`potential_trips.${potentialTripIndex}.group_largest_pickup_overlap_gap`] = pickupGap; //n62 +++
+                potentialTripUpdate[`potential_trips.${potentialTripIndex}.group_largest_destination_overlap_gap`] = destinationGap; //n62 +++
+                potentialTripUpdate[`potential_trips.${potentialTripIndex}.total_seat_count`] = nptTrip.seat_count; //n62 +++
+
+              }
+
+              transaction.update(potentialTrip.trip_ref, potentialTripUpdate);
+            }
+
+            //n63
+            let nearestTrip: MatchedTrip | null = null;
+            let minDistance = Infinity;
+            for(const matchedTrip of nptTrip.matched_trips){
+              const totalDistance = matchedTrip.pickup_distance + matchedTrip.destination_distance;
+              if(totalDistance < minDistance){
+                minDistance = totalDistance;
+                nearestTrip = matchedTrip;
+              }
+            }
+            //n64
+            if(nearestTrip){
+              const tripsWithSameDistance = nptTrip.matched_trips.filter(mt => mt.pickup_distance + mt.destination_distance === nearestTrip!.pickup_distance + nearestTrip!.destination_distance);
+
+              let tripToReserve: MatchedTrip;
+              //n65
+              if(tripsWithSameDistance.length > 1){
+                const randomIndex = Math.floor(Math.random() * tripsWithSameDistance.length);
+                tripToReserve = tripsWithSameDistance[randomIndex];
+              } else {
+                tripToReserve = nearestTrip;
+              }
+
+              //n66
+              const tripToReserveRef = tripToReserve.trip_ref;
+              transaction.update(tripToReserveRef, {
+                reserved: true,
+                reserving_trip_ref: nptTripRef,
+              });
+              //n67
+              const nptMatchedTripIndex = nptTrip.matched_trips.findIndex(mt => mt.trip_ref.id === tripToReserveRef.id);
+              if(nptMatchedTripIndex != -1){
+                  transaction.update(nptTripRef, {
+                    [`matched_trips.${nptMatchedTripIndex}.reserving`]: true,
+                  });
+              }
+
+              //n68
+              const newlyReservedTrip = (await transaction.get(tripToReserveRef)).data() as Trip;
+              if(!newlyReservedTrip){
+                throw new HttpsError('not-found', 'newly reserved trip not found')
+              }
+              const newlyReservedTripMatchedTripsMutualTrue = newlyReservedTrip.matched_trips.filter(mt => mt.mutual);
+              const newlyReservedTripPotentialTripsMutualFalse = newlyReservedTrip.potential_trips.filter(pt => !pt.mutual);
+
+              for(const matchedTrip of newlyReservedTripMatchedTripsMutualTrue){
+                const matchedTripData = (await transaction.get(matchedTrip.trip_ref)).data() as Trip;
+                if(!matchedTripData){
+                  throw new HttpsError("not-found", `Trip data is null for trip ID: ${matchedTrip.trip_ref.id}, skipping...`);
+                }
+                if(!properMatch(nptTrip, matchedTripData)){ //check
+                    const matchedTripUpdate: Partial<Trip> = {};
+
+                    const matchedTripMatchedTripIndex = matchedTripData.matched_trips.findIndex(mt => mt.trip_ref.id === newlyReservedTrip.trip_id);
+                    if(matchedTripMatchedTripIndex != -1){ //delete
+                      matchedTripUpdate[`matched_trips.${matchedTripMatchedTripIndex}`] = FieldValue.delete();
+                    }
+
+                    const potentialTripToBeAdded: PotentialTripToBeAdded = { //Add
+                        paid: false,
+                        trip_group_ref: "",
+                        proper_match: true,
+                        trip_obstruction: false,
+                        seat_obstruction: false,
+                        reserving_trip_obstruction: true,
+                        mutual: !matchedTrip.mutual, //n69
+                        group_largest_pickup_overlap_gap: null,
+                        group_largest_destination_overlap_gap: null,
+                        unknown_trip_obstruction: false,
+                        total_seat_count: null,
+                        seat_count: newlyReservedTrip.seat_count
+                    };
+
+                    matchedTripUpdate.potential_trips = FieldValue.arrayUnion(potentialTripToBeAdded) as any
+
+                    transaction.update(matchedTrip.trip_ref, matchedTripUpdate);
+
+                    //n70
+                    const newlyReservedTripUpdate: Partial<Trip> = {};
+                    const newlyReservedTripMatchedTripIndex = newlyReservedTrip.matched_trips.findIndex(mt => mt.trip_ref.id === matchedTrip.trip_ref.id);
+                    const newlyReservedTripPotentialTripIndex = newlyReservedTrip.potential_trips.findIndex(pt => pt.trip_ref.id === matchedTrip.trip_ref.id)
+
+                    if(newlyReservedTripMatchedTripIndex != -1){
+                        newlyReservedTripUpdate[`matched_trips.${newlyReservedTripMatchedTripIndex}.mutual`] = !matchedTrip.mutual;
+                    }
+
+                    if(newlyReservedTripPotentialTripIndex != -1){
+                      newlyReservedTripUpdate[`potential_trips.${newlyReservedTripPotentialTripIndex}.mutual`] = !newlyReservedTrip.potential_trips[newlyReservedTripPotentialTripIndex].mutual;
+                    }
+                    transaction.update(tripToReserveRef, newlyReservedTripUpdate);
+                }
+              }
+
+              for(const potentialTrip of newlyReservedTripPotentialTripsMutualFalse){ //n69
+                const potentialTripData = (await transaction.get(potentialTrip.trip_ref)).data() as Trip;
+                if(!potentialTripData){
+                  throw new HttpsError("not-found", `Trip data is null for trip ID: ${potentialTrip.trip_ref.id}, skipping...`);
+                }
+                if(!properMatch(nptTrip, potentialTripData)){
+                  const potentialTripUpdate: Partial<Trip> = {};
+
+                  const potentialTripMatchedTripIndex = potentialTripData.matched_trips.findIndex(mt => mt.trip_ref.id === newlyReservedTrip.trip_id);
+                    if(potentialTripMatchedTripIndex != -1){ //delete
+                      potentialTripUpdate[`matched_trips.${potentialTripMatchedTripIndex}`] = FieldValue.delete();
+                    }
+
+                    const potentialTripToBeAdded: PotentialTripToBeAdded = { //Add
+                        paid: false,
+                        trip_group_ref: "",
+                        proper_match: true,
+                        trip_obstruction: false,
+                        seat_obstruction: false,
+                        reserving_trip_obstruction: true,
+                        mutual: !potentialTrip.mutual, //n69
+                        group_largest_pickup_overlap_gap: null,
+                        group_largest_destination_overlap_gap: null,
+                        unknown_trip_obstruction: false,
+                        total_seat_count: null,
+                        seat_count: newlyReservedTrip.seat_count
+                    };
+
+                    potentialTripUpdate.potential_trips = FieldValue.arrayUnion(potentialTripToBeAdded) as any
+
+                    transaction.update(potentialTrip.trip_ref, potentialTripUpdate);
+
+                    //n70
+                    const newlyReservedTripUpdate: Partial<Trip> = {};
+                    const newlyReservedTripMatchedTripIndex = newlyReservedTrip.matched_trips.findIndex(mt => mt.trip_ref.id === potentialTrip.trip_ref.id);
+                    const newlyReservedTripPotentialTripIndex = newlyReservedTrip.potential_trips.findIndex(pt => pt.trip_ref.id === potentialTrip.trip_ref.id)
+
+                    if(newlyReservedTripMatchedTripIndex != -1){
+                        newlyReservedTripUpdate[`matched_trips.${newlyReservedTripMatchedTripIndex}.mutual`] = !newlyReservedTrip.matched_trips[newlyReservedTripMatchedTripIndex].mutual;
+                    }
+
+                    if(newlyReservedTripPotentialTripIndex != -1){
+                      newlyReservedTripUpdate[`potential_trips.${newlyReservedTripPotentialTripIndex}.mutual`] = !newlyReservedTrip.potential_trips[newlyReservedTripPotentialTripIndex].mutual;
+                    }
+                    transaction.update(tripToReserveRef, newlyReservedTripUpdate);
+                }
+              }
+              //n71
+              const newlyReservedTripMatchedTripsMutualTrueOnlyNPT = newlyReservedTrip.matched_trips.filter(mt => mt.mutual && mt.trip_ref.id === nptTrip.trip_id && newlyReservedTrip.matched_trips.length === 1);
+              const newlyReservedTripPotentialTripsMutualFalseOnlyNPT = newlyReservedTrip.potential_trips.filter(pt => !pt.mutual && pt.trip_ref.id === nptTrip.trip_id && newlyReservedTrip.matched_trips.length === 1)
+
+              for(const matchedTrip of newlyReservedTripMatchedTripsMutualTrueOnlyNPT){ //n72
+                transaction.update(matchedTrip.trip_ref, {
+                  status: "unmatched",
+                });
+              }
+
+              for(const potentialTrip of newlyReservedTripPotentialTripsMutualFalseOnlyNPT){ //n72
+                transaction.update(potentialTrip.trip_ref, {
+                  status: "unmatched"
+                });
+              }
+
+              //n73
+              const newlyReservedTripMatchedTripsMutualFalse = newlyReservedTrip.matched_trips.filter(mt => !mt.mutual);
+              const newlyReservedTripPotentialTripsMutualTrue = newlyReservedTrip.potential_trips.filter(pt => pt.mutual);
+
+              for(const matchedTrip of newlyReservedTripMatchedTripsMutualFalse){ //n74
+                const matchedTripData = (await transaction.get(matchedTrip.trip_ref)).data() as Trip;
+                if (!matchedTripData) {
+                  throw new HttpsError("not-found", `Trip data is null for trip ID: ${matchedTrip.trip_ref.id}, skipping...`);
+                }
+
+                if(!properMatch(nptTrip, matchedTripData)){
+                  const matchedTripUpdate: Partial<Trip> = {};
+                  const matchedTripPotentialTripIndex = matchedTripData.potential_trips.findIndex(pt => pt.trip_ref.id === newlyReservedTrip.trip_id);
+                  if(matchedTripPotentialTripIndex != -1){ //find
+                    matchedTripUpdate[`potential_trips.${matchedTripPotentialTripIndex}.reserving_trip_obstruction`] = true;
+                  }
+                  transaction.update(matchedTrip.trip_ref, matchedTripUpdate)
+                }
+              }
+
+              for(const potentialTrip of newlyReservedTripPotentialTripsMutualTrue){ //n74
+                const potentialTripData = (await transaction.get(potentialTrip.trip_ref)).data() as Trip;
+                if (!potentialTripData) {
+                  throw new HttpsError("not-found", `Trip data is null for trip ID: ${potentialTrip.trip_ref.id}, skipping...`);
+                }
+
+                if(!properMatch(nptTrip, potentialTripData)){
+                  const potentialTripUpdate: Partial<Trip> = {};
+                  const potentialTripPotentialTripIndex = potentialTripData.potential_trips.findIndex(pt => pt.trip_ref.id === newlyReservedTrip.trip_id);
+                  if(potentialTripPotentialTripIndex != -1){
+                      potentialTripUpdate[`potential_trips.${potentialTripPotentialTripIndex}.reserving_trip_obstruction`] = true;
+                  }
+                  transaction.update(potentialTrip.trip_ref, potentialTripUpdate)
+                }
+              }
+            }
+          //end of creating a new trip group logic
+          }

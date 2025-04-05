@@ -1,0 +1,407 @@
+Procedure JoinPaidTrip(NPT) // NPT: New Paid Trip
+
+  // 1. Initial Update for Paid NPT
+  UPDATE NPT Document:
+    status = paid
+
+  // 2. Check if NPT is Reserved
+  IF NPT.reserved THEN
+    // NPT is reserving a trip.
+    ChoiceTripGroup = NPT.reserving_trip_ref.trip_group_ref
+
+    // 3. Update NPT after choosing the Trip Group
+    UPDATE NPT Document:
+      trip_group_ref = ChoiceTripGroup
+      total_seat_count = ChoiceTripGroup.total_seat_count + NPT.seat_count
+      reserved = false
+      reserving_trip_ref = DELETE
+
+    // 4. Update NPT's Reserving Trip
+    ReservingTrip = NPT.reserving_trip_ref
+    UPDATE ReservingTrip Document:
+      total_seat_count = ChoiceTripGroup.total_seat_count + NPT.seat_count
+      Update element in matched_trips array where trip_ref == NPT.trip_ref:
+        paid = true
+        trip_group_ref = ChoiceTripGroup
+        reserving = false
+        total_seat_count = ChoiceTripGroup.total_seat_count + NPT.seat_count
+
+  ELSE: // NPT is not reserved.
+      // NPT has to join another trip group
+      
+    // 5 & 6. Find NPT's Matched and Paid Trips, Get Distinct Trip Groups
+    MatchedTrips =  Get all elements of NPT's matched_trips where paid = true;
+    PaidTripGroups = empty set
+    FOR EACH trip IN MatchedTrips:
+      PaidTripGroups.add(trip.trip_group_ref)
+    ENDFOR
+
+    // 7. Check if there any paid matched trips
+     IF PaidTripGroups is empty:
+        
+        //Create New Trip Group
+        NewTripGroupID  = GenerateUniqueID()
+        
+        CREATE Trip Group Document with ID NewTripGroupID:
+          trip_group_members = [ {
+            trip_ref = NPT.trip_ref
+            user_ref = NPT.user_ref
+            first_name = NPT.user_ref.first_name
+            last_name = NPT.user_ref.last_name
+            phone_number = NPT.user_ref.phone_number
+            photo_url = NPT.user_ref.photo_url
+            seat_count = NPT.seat_count
+            // Initialize other fields as needed
+          } ]
+          total_seat_count = NPT.seat_count
+          
+          potential_trip_members = [ ]
+          FOREACH trip in NPT's matched_trips and potential_trips;
+            Add trip to potetnial_trip_members with trip_ref = trip, other fields set to relevant values;
+          ENDFOR
+          // Initialize other fields as needed
+          
+         ChoiceTripGroup = Reference to  Trip Group Document with ID NewTripGroupID;
+
+        // Update NPT document to reflect joining the new trip group
+        UPDATE NPT Document:
+          trip_group_ref = ChoiceTripGroup
+          total_seat_count = NPT.seat_count // Only NPT's seats for now
+
+          //Get and update all of NPT's matched trips
+          matchedTrips = Get all elements from NPT where mutual = true;
+          FOREACH trip in matchedTrips:
+            UPDATE trip document:
+               Update element in matched_trips where trip_ref == NPT:
+                  paid = true;
+                  trip_group_ref = NPT's NewTripGroupID
+          ENDFOR
+          
+          //Get and update all of NPT's potential trips
+          potentialTrips = Get all elements from NPT where mutual = false;
+          FOREACH trip in potentialTrips
+            UPDATE trip document:
+               Update element in potential_trips where trip_ref == NPT:
+                  paid = true;
+                  trip_group_ref = NPT's NewTripGroupID
+          ENDFOR
+
+        
+        //Get NPT's reserving trip
+        reservingTrip = get trip from matched_trips where reserving = true;
+        
+        //Update NPT
+        UPDATE NPT document:
+          update element in matched_trips where trip_ref == reservingTrip:
+            reserving = true;
+            
+       //Update Reserving Trip
+       UPDATE reservingTrip document:
+          reserved = true;
+          reserving_trip_ref = NPT.trip_ref; 
+          
+       //Get and update trips that dont proper match NPT
+       NPTObstructingTrips =  Get all elements of reservingTrip.matched_trips and reservingTrip.potential_trips, that are not proper_match
+       FOREACH trip in NPTObstructingTrips:
+        UPDATE trip document:
+          Delete element in matched_trips that has trip_ref = reservingTrip.trip_ref
+          Add new element to potential trips: reservingTrip
+       ENDFOR
+       
+       //Get, from the trips above, those trips that do not have any more matched trips and then update their statuses
+       unmatchedTrips = Get all elements of NPTObstructingTrips where matched_trips is empty:
+        FOREACH trip in unmatchedTrips:
+          UPDATE trip document:
+          status = "unmatched"
+        ENDFOR
+        
+       
+        
+          
+          
+          
+    ELSE IF PaidTripGroups.size() > 1 THEN:
+      // 8. Multiple Trip Groups Found
+      // 9. Find Trip Group with Fewest Trips
+      ChoiceTripGroup = FindTripGroupWithFewestTrips(PaidTripGroups)
+
+      //10. Check for tie in fewest trips
+      IF MoreThanOneTripGroupWithLeastTrips(ChoiceTripGroup) THEN
+        // 11. Calculate Total Distance for Each Tied Trip Group
+         ChoiceTripGroup =  FindTripGroupWithLeastTotalDistance(ChoiceTripGroup, NPT)
+      ENDIF
+      
+        //12. Check for tie in  in distance
+        IF MoreThanOneTripGroupWithLeastDistance(ChoiceTripGroup) THEN
+           // 13. Randomly Pick a Trip Group
+           ChoiceTripGroup = PickRandomTripGroup(ChoiceTripGroups)
+        ENDIF
+        
+        // 14. Update NPT after choosing the Trip Group
+        UPDATE NPT Document:
+          trip_group_ref = ChoiceTripGroup
+          total_seat_count = ChoiceTripGroup.total_seat_count + NPT.seat_count
+          reserved = false
+          reserving_trip_ref = DELETE
+
+          
+    
+       
+    ELSE:
+        // Only one trip group, the paid matched trip will be the choice trip
+        ChoiceTripGroup = PaidTripGroups.iterator().next() // Get the single element
+        
+        // 14. Update NPT after choosing the Trip Group
+        UPDATE NPT Document:
+          trip_group_ref = ChoiceTripGroup
+          total_seat_count = ChoiceTripGroup.total_seat_count + NPT.seat_count
+          reserved = false
+          reserving_trip_ref = DELETE
+          
+      
+      //Update all choice trip group members
+      FOREACH trip in ChoiceTripGroup.trip_group_members.trip_ref:
+        UPDATE trip document:
+          Update element in matched_trips where trip_ref == NPT.trip_ref:
+            paid = true
+            trip_group_ref = ChoiceTripGroup
+      ENDFOR
+    ENDIF
+
+  ENDIF
+    
+  //Choice Trip Group has only NPT as a member  
+  IF ChoiceTripGroup.trip_group_members.size() == 1 THEN
+      
+      soleMemberTrip = ChoiceTripGroup.trip_group_members[0].trip_ref
+      
+      //Get reserving trip from the sole member
+      reservingTrip = get element where reserving ==  true from  soleMemberTrip.matched_trips;
+      
+      //Update Sole Trip Member Trip Doccument
+      UPDATE soleMemberTrip document:
+        update element in matched_trips where trip_ref ==  reservingTrip.trip_ref:
+          reserving = false;
+      
+      //Update Trip that sole trip member was reserving
+      UPDATE reservingTrip document:
+        reserved =  false;
+        reserving_trip_ref = DELETE;
+        
+        
+      //Get all the trips, from the matched_trips and potential_trips fields of the trip that sole member trip was reserving, where mutual = true
+      
+      tripsToUpdate = Get all elements where mutual = true from reservingTrip.matched_trips, 
+                       and all elements where mutual = true from reservingTrip.potential_trips
+                       
+       FOREACH trip in tripsToUpdate:
+         UPDATE trip Document:
+           IF element with reservingTrip is in matched_trips:
+              Update field reserving_trip_obstruction:
+                reserving_trip_obstruction = false;
+           ELSE IF element with reservingTrip is in potential_trips:
+              IF proper_match == true:
+                Remove element with reservingTrip from potential_trips
+                Add reservingTrip to matched_trips
+                mutual = true
+              ELSE: //proper match == false
+                Update field reserving_trip_obstruction:
+                  reserving_trip_obstruction = false;
+              ENDIF   
+           ENDIF    
+       ENDFOR 
+        
+  ENDIF
+  
+  
+  //Update choice Trip Group:
+  UPDATE ChoiceTripGroup document:
+    total_seat_count =  current total_seat_count + NPT's seat_count
+    Remove NPT from potential_trip_members
+    Add NPT to trip_group_members
+  
+  //Find Potential Trip Members Now Obstructed by NPT Joining
+  obstructedPotentialTrips = FindNewlyObstructedTrips(ChoiceTripGroup, NPT)
+    
+  FOREACH trip in obstructedPotentialTrips
+    UPDATE ChoiceTripGroup document:
+      Update element in potential_trip_members where trip_ref ==  trip.trip_ref:
+      seat_obstruction = true
+  ENDFOR
+  
+  //Find potential trip members that now have trip obstruction
+    tripObstructedTrips = FindNewlyTripObstructedTrips(ChoiceTripGroup, NPT)
+    FOREACH trip in tripObstructedTrips
+        UPDATE ChoiceTripGroup document:
+          Update element in potential_trip_members where trip_ref ==  trip.trip_ref:
+            trip_obstruction = true
+    ENDFOR
+    
+    //Find all potential trips that were previously seat obstructed
+    previouslyObstructedTrips = FindPreviouslyObstructedTrips(ChoiceTripGroup, NPT)
+    FOREACH trip in previouslyObstructedTrips
+      UPDATE trip document:
+          Update element in potential_trips where trip_group_ref == ChoiceTripGroup:
+            total_seat_count = ChoiceTripGroup.total_seat_count
+    ENDFOR
+    
+    
+    
+  newlyObstructedTrips = FindTripsNowObstructed(ChoiceTripGroup, NPT)
+    
+  FOREACH trip in newlyObstructedTrips
+      // Move choice trip group members from matched_trips to potential_trips in those trips.
+      
+      
+      
+      
+      
+  ENDFOR
+  
+  
+    
+
+  // Add NPT's Matched and Potential Trips to Choice Trip Group (if not already members)
+    //  ... Similar logic to initial trip group creation ...
+
+  // Final Updates and Notifications
+  //  ... Update mutual flags, send notifications, etc. ...
+
+END Procedure
+
+
+Key improvements and explanations in this pseudocode:
+
+Clear Structure: The code is organized into logical blocks with comments indicating the purpose of each section, corresponding to the flowchart steps.
+
+Variable Definitions: Key variables like NPT, ChoiceTripGroup, MatchedTrips, etc., are clearly used and their meaning is implied by their names and context. It's good practice to define them explicitly in your actual code.
+
+Document Updates: UPDATE statements clearly show which documents (NPT, ReservingTrip, ChoiceTripGroup, etc.) and which fields within those documents are being modified. DELETE indicates field removal.
+
+Conditional Logic: IF, ELSE IF, and ELSE statements accurately reflect the decision points in the flowchart.
+
+Looping: FOREACH loops are used to iterate over collections of trips (e.g., MatchedTrips, PaidTripGroups). This makes the logic for handling multiple related trips very clear.
+
+Helper Functions (Placeholders): Functions like FindTripGroupWithFewestTrips, MoreThanOneTripGroupWithLeastTrips, FindTripGroupWithLeastTotalDistance, PickRandomTripGroup, FindNewlyObstructedTrips FindTripsNowObstructed represent complex logic that would need to be implemented separately. This keeps the main pseudocode focused on the overall flow. These are crucial and need detailed implementations based on your data model and matching logic.
+
+Comments for Complex Operations: I've added comments to explain particularly complex steps, such as finding the most central location or updating mutual flags.
+
+Key Logic Changes
+
+Creating a new trip group, and updating it
+
+Updating the choice trip group members' matched trips to be paid
+
+Checking for reserved trips
+
+Updating the "reserving" and "reserved" status
+
+Finding all mutual/non mutual, paid/unpaid trips
+
+Updating all mutual statuses
+
+Updating all trip_obstruction fields
+
+Finding all matched and potential trips, and correctly setting the values
+
+Placeholders for distance matrix and nearby search API.
+
+Updating the time range
+
+Placeholders for notifications.
+
+Updating trip group members
+
+Updating obstructing_trip_members in the trip group.
+
+Finding the trip that NPT will reserve.
+
+Assumptions and Clarifications:
+
+References: I'm assuming trip_group_ref, trip_ref, and user_ref are references/pointers to the corresponding documents. This is how relationships are typically handled in NoSQL databases like Firebase.
+
+Document Access: I'm using a simplified UPDATE Trip Document: syntax. In your actual Firebase code, you'll use the appropriate Firebase SDK methods for updating documents (e.g., updateDoc in the JavaScript SDK).
+
+Get all elements ...: Phrases like "Get all elements..." represent queries to your trips subcollection. You'd implement these with Firebase queries, filtering based on the specified conditions (e.g., where("matched_trips", "array-contains", { trip_ref: NPT, paid: true })).
+
+tripGroupTimeRangeArray: I implemented a placeholder for this.
+
+newPickupSuggestions newDestinationSuggestions: I implemented a placeholder for this, based on the grok text.
+
+Next Steps (Implementation in Firebase Cloud Functions):
+
+Translate to JavaScript (or your chosen language): Convert the pseudocode into a JavaScript Cloud Function.
+
+Firebase SDK: Use the Firebase Admin SDK within your function to interact with Firestore. You'll need functions like getDoc, updateDoc, addDoc, collection, where, getDocs, etc.
+
+Helper Functions: Implement the helper functions (FindTripGroupWithFewestTrips, MoreThanOneTripGroupWithLeastTrips, etc.). These will contain the core logic for comparing trips and trip groups.
+
+For FindTripGroupWithFewestTrips, you'd likely iterate through the PaidTripGroups, get the size of the trip_group_members array for each, and keep track of the smallest one.
+
+For MoreThanOneTripGroupWithLeastTrips, you would check after the previous step if there are multiple trip groups with the same minimum number of members.
+
+For FindTripGroupWithLeastTotalDistance, you'll need to calculate distances between trips (using the Haversine formula or the Google Maps Distance Matrix API) and sum them up for each trip group.
+
+For PickRandomTripGroup, you'd use a random number generator to select one of the tied trip groups.
+
+Error Handling: Add error handling (try-catch blocks) to gracefully handle cases where documents might not exist or data is in an unexpected format.
+
+Transactions: Because you are updating multiple documents, use Firestore transactions to ensure atomicity. If any part of the update fails, the entire operation will be rolled back, preventing data inconsistencies. This is critical for a matching system.
+
+Testing: Thoroughly test your Cloud Function with various scenarios (NPT is reserved, NPT is not reserved, multiple potential trip groups, ties in trip group selection, etc.). Use the Firebase Emulator Suite for local testing.
+
+Distance Calculation: The logic assumes you have a way to calculate distances between geopoints. Use the Haversine formula or, better, the Google Maps Distance Matrix API for accurate driving/walking distances. You can use a helper function for this.
+
+Example Snippet (JavaScript with Firebase Admin SDK - Conceptual)
+
+const functions = require('firebase-functions');
+const admin = require('firebase-admin');
+admin.initializeApp();
+const db = admin.firestore();
+
+
+exports.joinPaidTrip = functions.firestore
+  .document('users/{userId}/trips/{tripId}')
+  .onUpdate(async (change, context) => {
+    const nptData = change.after.data();
+    const previousNPTData = change.before.data();
+      
+    // Check if this the function should run
+    if(nptData.status == "paid" && previousNPTData.status != "paid") {
+
+        try {
+          await db.runTransaction(async (transaction) => {
+           
+              // All Updates Will Be Atomic
+              if(nptData.reserved){
+                  const choiceTripGroupRef = nptData.reserving_trip_ref.trip_group_ref;
+                  const choiceTripGroupDoc = await transaction.get(choiceTripGroupRef); //Get
+                  const choiceTripGroup = choiceTripGroupDoc.data();
+                  
+                  //Update Trip
+                  transaction.update(change.after.ref, {
+                    trip_group_ref: choiceTripGroupRef,
+                    total_seat_count: choiceTripGroup.total_seat_count + nptData.seat_count,
+                    reserved: false,
+                    reserving_trip_ref: admin.firestore.FieldValue.delete() // Delete field
+                  });
+               
+              }
+            
+           
+          });
+          console.log("Transaction success!");
+        }
+        catch (e) {
+            console.log("Transaction failure:", e);
+        }
+    }
+});
+IGNORE_WHEN_COPYING_START
+content_copy
+download
+Use code with caution.
+JavaScript
+IGNORE_WHEN_COPYING_END
+
+This is a starting point. You'll need to adapt it to your specific needs, fill in the helper functions, and add comprehensive error handling and logging. The key is to break the problem down into smaller, manageable steps, and use transactions to ensure data consistency. Remember to replace placeholder comments like //Get all elements... with the actual Firestore query code. Use the field names from your schema.

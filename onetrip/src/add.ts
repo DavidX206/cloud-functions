@@ -305,7 +305,7 @@ exports.tripAddedFunction = onDocumentCreated("users/{userId}/trips/{tripId}",
                 const obstructingTripMembers = await generateObstructingTripMembersFromGroup(oldTripGroupData);
                 await oldTripGroupDocRef
                 .update({
-                    potential_trips: arrayUnion({
+                    potential_trip_members: arrayUnion({
                         trip_id: tripId,
                         seat_obstruction: fully_matched ? false : checkRemaningSeats(oldTripGroupData, newTripData),
                         trip_obstruction: fully_matched ? false : isProperMatchWithTripGroupMembers(oldTripGroupData, newTripData),
@@ -620,7 +620,7 @@ exports.tripAddedFunction = onDocumentCreated("users/{userId}/trips/{tripId}",
                         if (isProperMatch(trip, newTripData, pickupDistance[index].distance, destinationDistance[index].distance) &&
                             await isProperMatchWithTripGroupMembers(oldTripGroupData, newTripData) &&
                             checkRemaningSeats(oldTripGroupData, newTripData)) {
-                            if (await checkOldTripGroupPotentialTrips(oldTripGroupData, oldTripGroupDocRef)) {
+                            if (await checkOldTripGroupPotentialTrips(oldTripGroupData, oldTripGroupDocRef, {fully_matched: true})) {
                                 await updateOldTripMatchedTrips(trip.trip_id, trip.user_id, potentialNewTrip, {paid: false, reserving: false, mutual: false});
 
                                 await updateNewTripMatchedTrips(potentialTrips[index], {paid: true, reserving: false, mutual: true});

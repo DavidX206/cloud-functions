@@ -1,4 +1,4 @@
-import { Timestamp } from 'firebase-admin/firestore'; 
+import { DocumentReference, Timestamp } from 'firebase-admin/firestore'; 
 
 // User types
 interface User {
@@ -9,32 +9,32 @@ interface User {
   phone_number: string;
   first_name: string;
   last_name: string;
+  date_of_birth: Timestamp;
   transactions: Record<string, any>[];
   ticket_count: number;
-  trips?: Trip[]; // Optional subcollection
 }
 
 // Trip types
 interface Trip {
   trip_id: string;
-  trip_group_id: string;
-  user_id: string;
+  user_ref: DocumentReference;
+  trip_group_ref: DocumentReference;
   pickup_description: string;
   pickup_short_description: string;
+  pickup_address: string;
   pickup_latlng: LatLng;
   pickup_city: string;
   pickup_radius: number;
   destination_description: string;
   destination_short_description: string;
+  destination_address: string;
   destination_latlng: LatLng;
   destination_city: string;
   destination_radius: number;
   seat_count: number;
   start_date_time: Timestamp;
-  start_date_string: string;
   end_date_time: Timestamp;
-  end_date_string: string;
-  time_range_array: any[];
+  time_range_array: string[];
   total_seat_count: number;
   status: string;
   fully_matched: boolean;
@@ -42,10 +42,13 @@ interface Trip {
   matched_trips: MatchedTrip[];
   potential_trips: PotentialTrip[];
   reserved: boolean;
-  reserving_trip_id: string;
-  reserving_trip_user_id: string;
+  reserving_trip_ref: DocumentReference;
   time_of_creation: Timestamp;
   time_of_payment: Timestamp;
+  last_notification_time: Timestamp;
+  pending_edit_count: number;
+  pending_edit_gaps: [];
+  trip_alerts: {}[];
 }
 
 interface LatLng {
@@ -54,9 +57,8 @@ interface LatLng {
 }
 
 interface MatchedTrip {
-  trip_id: string;
-  user_id: string;
-  trip_group_id: string;
+  trip_ref: DocumentReference;
+  trip_group_ref: DocumentReference | null;
   paid: boolean;
   pickup_radius: number;
   destination_radius: number;
@@ -68,10 +70,9 @@ interface MatchedTrip {
 }
 
 interface PotentialTrip {
-  trip_id: string;
-  user_id: string;
+  trip_ref: DocumentReference;
   paid: boolean;
-  trip_group_id: string;
+  trip_group_ref: DocumentReference | null;
   pickup_radius: number;
   destination_radius: number;
   pickup_distance: number;
@@ -90,19 +91,17 @@ interface PotentialTrip {
 
 // Trip Group types
 interface TripGroup {
-  trip_group_id: string;
   trip_group_members:TripGroupMember[];
-  recent_message: RecentMessage;
+  recent_message: RecentMessage | null;
   total_seat_count: number;
   potential_trip_members: PotentialTripMember[];
   pickup_location_suggestions: PickupLocationSuggestion[];
   destination_suggestions: DestinationSuggestion[];
-  messages?: Message[]; // Optional subcollection
 }
 
 interface TripGroupMember {
-  trip_id: string;
-  user_id: string;
+  trip_ref: DocumentReference;
+  user_ref: DocumentReference;
   first_name: string;
   last_name: string;
   phone_number: string;
@@ -110,24 +109,26 @@ interface TripGroupMember {
   seat_count: number;
   joined_timestamp: Timestamp;
   last_message_read_id: string;
-  earliest_date_time: Timestamp;
-  latest_date_time: Timestamp;
+  time_range_array: string[];
+  arrived: boolean;
+  trip_group_leader: boolean;
+  canceled: boolean;
 }
 
 interface RecentMessage {
   message_id: string;
+  message_ref: DocumentReference;
   message_type: string;
   message: string;
   audio?: string;
-  from_id: string;
+  user_ref: DocumentReference;
   from_first_name: string;
   timestamp: Timestamp;
   seenBy: string[];
 }
 
 interface PotentialTripMember {
-  trip_id: string;
-  user_id: string;
+  trip_ref: DocumentReference;
   obstructing_trip_members: ObstructingTripMember[];
   trip_obstruction: boolean;
   seat_obstruction: boolean;
@@ -136,9 +137,9 @@ interface PotentialTripMember {
 }
 
 interface ObstructingTripMember {
-  trip_id: string;
-  pickup_overlap_gap: number;
-  destination_overlap_gap: number;
+  trip_ref: DocumentReference;
+  pickup_overlap_gap: number | null;
+  destination_overlap_gap: number | null;
   unknown: boolean;
 }
 
@@ -147,6 +148,7 @@ interface PickupLocationSuggestion {
   pickup_suggestion_address: string;
   pickup_suggestion_location: LatLng;
   distances_from_trip_pickup_locations: DistanceFromLocation[];
+  pickup_suggestion_voters: string[];
 }
 
 interface DestinationSuggestion {
@@ -154,6 +156,7 @@ interface DestinationSuggestion {
   destination_suggestion_address: string;
   destination_suggestion_location: LatLng;
   distances_from_trip_destinations: DistanceFromLocation[];
+  destination_suggestion_voters: string[];
 }
 
 interface DistanceFromLocation {
@@ -163,7 +166,7 @@ interface DistanceFromLocation {
 
 interface PotentialTripToBeAdded {
     paid: boolean;
-    trip_group_id: string;
+    trip_group_ref: DocumentReference | "";
     proper_match: boolean;
     trip_obstruction: boolean;
     seat_obstruction: boolean;
@@ -177,7 +180,7 @@ interface PotentialTripToBeAdded {
   }
 
 interface MatchedTripToBeAdded {
-    trip_group_id: string;
+    trip_group_ref: DocumentReference | "";
     paid: boolean;
     mutual: boolean;
     reserving: boolean;
@@ -185,9 +188,8 @@ interface MatchedTripToBeAdded {
   }
 
 interface Message {
-  message_id: string;
   message_type: string;
-  from_id: string;
+  user_ref: DocumentReference;
   message: string;
   timestamp: Timestamp;
   audio?: string;
@@ -196,16 +198,29 @@ interface Message {
   first_name: string;
   last_name: string;
   seenBy: string[];
+  newly_paid_trip_ref: DocumentReference;
   redundant: boolean;
+  system_message: boolean;
+  new_pickup_suggestion: boolean;
+  new_destination_suggestion: boolean;
+  group_time_range_array_changed: boolean;
+  group_time_range_array: string[];
 }
 
 interface TripGroupInfo{
   tripGroupId: string,
   tripObstruction: boolean,
   seatObstruction: boolean,
-  largestPickupOverlapGap: number,
-  largestDestinationOverlapGap: number,
+  largestPickupOverlapGap: number | null,
+  largestDestinationOverlapGap: number | null,
 }
+
+type ArrayFieldToDetails = {
+  matched_trips: MatchedTrip;
+  potential_trips: PotentialTrip;
+  destination_suggestions: DestinationSuggestion;
+  pickup_location_suggestions: PickupLocationSuggestion;
+};
 
 export type {
   User,
@@ -225,4 +240,5 @@ export type {
   DistanceFromLocation,
   Message,
   TripGroupInfo,
+  ArrayFieldToDetails,
 };

@@ -1,0 +1,388 @@
+// --- START (n0) ---
+// Initialize the process; no specific action besides marking the beginning.
+
+// --- READ TRIP DOCUMENT (n1) ---
+// Input:  New Trip Document (from database)
+// Action: Read the newly posted trip's details from the database.
+
+// --- QUERY ALL TRIPS DOCUMENT BY CITY AND TIME (n2) ---
+// Input:  New Trip's City and Time Range
+// Action: Query the database for all existing trips ('old trips') that match the new trip's city (both pickup and destination) and time range.
+
+// --- ANY TRIPS FOUND? (n3) ---
+// Input:  Result of the database query (list of 'old trips')
+// Action: Check if any matching trips were found in the previous step.
+// Output:
+//   - YES: Proceed to check the number of trips found.
+//   - NO:  Go to update the new trip's status to "unmatched".
+
+// --- NO. OF TRIPS FOUND > 625? (n4) ---
+// Input: Number of trips found.
+// Action: Determine matching strategy based on the number of trips
+// Output:
+//   - YES (More than 625 trips):  Use batched API calls (pickup location matching, max 625 at once).
+//   - NO (625 or fewer trips):   Use a single API call (pickup location matching)
+
+// --- Initialize nextBatch and pickupMatches Arrays (n5) ---
+// Input: None
+// Action:
+//   - Create an empty array called `nextBatch`. This will hold a subset of the trips for Radar API calls (max 625).
+//   - Create an empty array called `pickupMatches`.  This will store trips that match the new trip's pickup location.
+
+// --- LOOP THROUGH CITY AND TIME MATCHES (n6) ---
+// Input: 'City and Time Matches' array (from n2) - we'll refer to this as 'x'
+// Action:
+//   - Start a loop (for i = 0; i < x.length; i++).
+//   - Inside the loop, populate `nextBatch` with trips from `x`.
+
+// --- nextBatch.length = 625? (n7) ---
+// Input: `nextBatch` array
+// Action: Check if `nextBatch` is full (reached the limit of 625).
+// Output:
+//    - YES: The batch is full, proceed with the API call.
+//    - NO: Check if it is the end of the array 'x' from step 6.
+
+// --- i = x.length? (n8) ---
+// Input: loop counter `i` and array `x`.length.
+// Action: Check if the loop has reached the end of array 'x'.
+// Output:
+//    -YES: Proceed to API calls
+//    -NO: Populate nextBatch array and go back to step n7.
+
+// --- EXECUTE RADAR ROUTE MATRIX API CALL (PICKUP MATCHING, BATCHED) (n9) ---
+// Input:  `nextBatch` array, New Trip's pickup location (`pickup_latlng`)
+// Action:
+//   - Call the Radar Matrix API.
+//   - Origin:  New Trip's `pickup_latlng`.
+//   - Destinations:  `pickup_latlng` of each trip in `nextBatch`.
+//   - Mode:  (Assumed to be 'car' or similar, based on context).
+//   - Units: (Assumed to be metric, based on 10km radius).
+//   - Filter the results:  Identify trips in `nextBatch` where the distance is within a 10km radius of the new trip's pickup location.
+//   - Store the matching trips (and their relevant properties) in the `pickupMatches` array.
+
+// --- CLEAR nextBatch ARRAY (n10) ---
+// Input: `nextBatch` array
+// Action: Empty the `nextBatch` array: `nextBatch = []`.
+// Loop back to n6.
+
+// --- EXECUTE RADAR ROUTE MATRIX API CALL (PICKUP MATCHING, SINGLE CALL) (n11) ---
+// Input:  'City and Time Matches' array (from n2), New Trip's pickup location (`pickup_latlng`)
+// Action:
+//   - Call the Radar Matrix API.
+//   - Origin: New Trip's `pickup_latlng`.
+//   - Destinations: `pickup_latlng` of each trip in the 'City and Time Matches' array.
+//   - Mode: (Assumed to be 'car').
+//   - Units: (Assumed to be metric).
+//   - Filter: Identify trips where the distance is within a 9.85km radius of the new trip's pickup location.
+//   - Store matching trips (and relevant properties) in the `pickupMatches` array.
+
+// --- ANY TRIPS IN pickupMatches ARRAY? (n12) ---
+// Input:  `pickupMatches` array
+// Action: Check if any trips were added to `pickupMatches`.
+// Output:
+//   - YES: Proceed to destination matching (n13).
+//   - NO:  Proceed to update trip status to unmatched.
+
+// --- ANY TRIPS IN pickupMatches ARRAY? (n13) ---
+// duplicate, it must be destination matching as indicated in node 12 yes output.
+// Action: proceed to initialize nextBatch and matchedTrips arrays.
+
+// --- Initialize nextBatch and matchedTrips Arrays (n14) ---
+// Input: None
+// Action:
+//    - nextBatch = [];
+//    - matchedTrips = [];
+
+// --- LOOP THAT GOES THROUGH THE pickupMatches ARRAY (n15) ---
+// Input:  `pickupMatches` array (we'll refer to this array as 'x')
+// Action:
+//   - Start a loop (for i = 0; i < x.length; i++)
+//   - Populate `nextBatch` with trips from the `pickupMatches` array, up to a maximum of 625 trips per batch.
+
+// --- nextBatch.length = 625? (n16) ---
+// Input: nextBatch array.
+// Action: check if nextBatch is full.
+// Output:
+//    -YES: proceed to Radar API call.
+//    -NO: check if it is the end of x array.
+
+// --- i = x.length? (n17) ---
+// Input: `i` and `x.length`
+// Action: check if the loop has reached the end of `pickupMatches` array
+// Output:
+//    -YES:  Proceed to API calls.
+//    -NO: Continue populating `nextBatch`, loop to n16
+
+// --- EXECUTE RADAR ROUTE MATRIX API CALL (DESTINATION MATCHING, BATCHED) (n18) ---
+// Input:  `nextBatch` array, New Trip's destination location (`destination_latlng`)
+// Action:
+//   - Call the Radar Matrix API.
+//   - Origin:  New Trip's `destination_latlng`.
+//   - Destinations: `destination_latlng` of each trip in `nextBatch`.
+//   - Mode: (Assumed to be 'car').
+//   - Units: (Assumed to be metric).
+//   - Filter: Identify trips in `nextBatch` within a 10km radius of the new trip's destination.
+//   - Store matching trips (with properties) in the `matchedTrips` array.
+
+// --- CLEAR nextBatch ARRAY (n19) ---
+// Input: `nextBatch` array
+// Action: Empty the `nextBatch` array: `nextBatch = []`.
+// Loop back to n15.
+
+// --- EXECUTE RADAR ROUTE MATRIX API CALL (DESTINATION MATCHING, SINGLE CALL) (n20) ---
+// Input:  `pickupMatches` array, New Trip's destination location (`destination_latlng`).
+// Action:
+//   - Call the Radar Matrix API.
+//   - Origin: New Trip's `destination_latlng`.
+//   - Destinations: `destination_latlng` of each trip in `pickupMatches`.
+//   - Mode: (Assumed to be 'car').
+//   - Units: (Assumed to be metric).
+//   - Filter:  Identify trips within a 9.85km radius of the new trip's destination.
+//   - Store these trips (with their relevant properties) in the `matchedTrips` array.
+
+// --- ANY TRIPS FOUND IN matchedTrips ARRAY? (n21) ---
+// Input:  `matchedTrips` array
+// Action: Check if the `matchedTrips` array contains any trips.
+// Output:
+//   - YES: Proceed to process matches.
+//   - NO:  Update new trip's status to "unmatched".
+
+// --- READ matchedTrips ARRAY OF DOCUMENTS ONE BY ONE TILL IT’S END (LOOP) (n22) ---
+// Input: matchedTrips array
+// Action: Iterate through each 'old trip' in the `matchedTrips` array.
+// Output:
+//   -YES: continue to process matches.
+//   -NO: continue to ask "isNewTripMatched?".
+
+// --- UPDATE NEW TRIP’S STATUS FIELD TO UNMATCHED (n23) ---
+// Input:  New Trip Document
+// Action: Set the new trip's `status` field to "unmatched" in the database.
+
+// --- isNewTripMatched? (n24) ---
+// Input:  `isNewTripMatched` variable (Boolean, initially assumed false).
+// Action: Check if the `isNewTripMatched` flag is true. This flag is updated if a *mutual* match is found.
+// Output:
+//    -YES: continue to execute batch write.
+//    -NO: continue to update new trip's status to "unmatched".
+
+// --- EXECUTE BATCH WRITE (n25)---
+// Input: All modified trip documents (new and old)
+// Action: Perform a batch write operation to the database to update all changes at once.
+
+// --- END (n26) ---
+// Action: Terminate the process.
+
+// --- IS OLDTRIP'S STATUS "UNMATCHED" OR "MATCHED"? (n27) ---
+// Input: Old Trip document
+// Action:
+//  - Check old trip's status
+// Output:
+// - If status is "unmatched" or "matched" continue processing.
+// - If status is not "unmatched" or "matched", go to trip's status is paid.
+
+// --- TRIP’S STATUS IS PAID (n28) ---
+// Input: old trip
+// Action: Take no further action for the old trip because old trip has been paid for.
+
+// --- IS OLDTRIP A PROPER MATCH? (n29) ---
+// Input:  New Trip, Current Old Trip (from `matchedTrips`)
+// Action: Call function isProperMatch(newTrip, oldTrip).
+// Output:
+//   -YES: Check is old trip reserved.
+//   -NO: check is trip status "unmatched".
+
+// --- IS TRIP STATUS “UNMATCHED”? (n30) ---
+// Input: old trip.
+// Action: Check old trip status.
+// Output:
+//   -YES: update old trip status to "matched"
+//   -NO: add old trip to new trip matched_trips array.
+
+// --- UPDATE OLD TRIP'S STATUS FIELD TO "MATCHED" (n31) ---
+// Input: old trip
+// Action: Set old trip's `status` to "matched".
+
+// ---ADD OLD TRIP TO NEW TRIP MATCHED_TRIPS ARRAY (n32) ---
+// Input: old trip, new trip.
+// Action:
+//     - Add the old trip to the new trip's `matched_trips` array.
+//     - Set `mutual` to true.
+//     - Set other properties like `pickup_radius`, `destination_radius`, `pickup_distance`, `destination_distance`, paid=false and reserving = false.
+
+// ---ADD NEW TRIP TO OLD TRIP MATCHED_TRIPS ARRAY (n33) ---
+// Input: old trip, new trip.
+// Action:
+//     - Add the new trip to the old trip's `matched_trips` array.
+//     - Set `mutual` to true.
+//     - Set other properties like `pickup_radius`, `destination_radius`, `pickup_distance`, `destination_distance`, paid=false and reserving = false.
+
+// --- IS OLD TRIP A PROPER MATCH WITH NEW TRIP? AND IS NEW TRIP A PROPER MATCH WITH ALL MEMBERS OF OLDTRIP’S TRIP GROUP? AND IS (4 - TOTAL SEAT COUNT OF OLDTRIP’S TRIP GROUP) ≥ NEW TRIP’S SEAT COUNT? (n34) ---
+// Input:  New Trip, Current Old Trip, Old Trip's Trip Group (if it exists)
+// Action:
+//   1. Check if `isProperMatch(newTrip, oldTrip)` returns true.
+//   2. If the old trip has a `trip_group_id`:
+//      a. Retrieve the Trip Group document.
+//      b. For each member in `trip_group_members` (excluding the current old trip):
+//         - Retrieve the trip document for that member.
+//         - Check if `isProperMatch(newTrip, groupMemberTrip)` returns true.  If *any* return false, the overall result is false.
+//      c. Calculate: `remainingSeats = 4 - total_seat_count` (of the old trip's group).
+//      d. Check if `remainingSeats >= newTrip.seat_count`.
+//   3. If the old trip does *not* have a `trip_group_id`, then only step 1 is relevant.
+// Output:
+//   - YES (all conditions are true):
+//   - NO (any condition is false):
+
+// --- IS TRIP ALREADY ONE OF TRIP GROUP’S POTENTIAL_TRIP_MEMBERS? (n35) ---
+// Input old trip's trip group, new trip.
+// Action: check if new trip is already in old trip's group potential_trip_members array.
+// Output:
+//   - YES:  Skip adding, go to check if new trip and old trip proper match.
+//   - NO:  Add to group, go to update old trip's trip group document.
+
+// --- Old trip's Trip group document update (n36) ---
+// Input: old trip's trip group, new trip.
+// Action:
+// - Add new trip to potential trip members with its fields.
+
+// --- DOES NEW TRIP MATCH PROPERLY WITH OLD TRIP? (n37) ---
+// Input: new trip, old trip.
+// Action:
+// - Call a function, isProperMatch(newTrip, oldTrip).
+// Output:
+//   - YES: update new trip document (add old trip to new trip's potential trips)
+//   - NO: update new trip document (add old trip to new trip's potential trips, and make proper_match: false)
+
+// --- New trip document update: (n38) ---
+// Input: new trip, old trip.
+// Action:
+// - Add old trip to new trip's potential_trips array with proper_match: true
+
+// --- New trip document update (n39) ---
+//Input: new trip, old trip.
+// Action:
+// - Add old trip to new trip's potential_trips array with proper_match: false
+
+// --- OLD TRIP DOCUMENT UPDATE: (n40) ---
+// Input:  Old Trip, New Trip
+// Action:
+//    - Add new trip to old trip's potential_trips array, marking properties as mentioned in diagram.
+
+// --- OLD TRIP DOCUMENT UPDATE: (n41) ---
+// Input:  Old Trip, New Trip
+// Action:
+//    - Add new trip to old trip's potential_trips array, marking properties as mentioned in diagram.
+
+// --- IS TRIP ALREADY ONE OF TRIP GROUP’S MATCHED_POTENTIAL_TRIP_MEMBERS? (n42) ---
+// Input old trip's trip group, new trip.
+// Action: check if new trip is already in old trip's group matched_potential_trip_members array.
+// Output:
+//   - YES:  Skip adding, go to check if new trip and old trip proper match.
+//   - NO:  Add to group, go to update old trip's trip group document.
+
+// --- Old trip's Trip group document update (n43) ---
+// Input: old trip's trip group, new trip.
+// Action:
+// - Add new trip to potential trip members with its fields.
+
+// --- OLD TRIP DOCUMENT UPDATE: (n44) ---
+// Input:  Old Trip, New Trip
+// Action:
+//    - Add new trip to old trip's matched_trips array, marking properties as mentioned in diagram.
+
+// --- NEW TRIP DOCUMENT UPDATE: (n45) ---
+// Input:  Old Trip, New Trip
+// Action:
+//    - Add old trip to new trip's matched_trips array, marking properties as mentioned in diagram.
+
+// --- UPDATE NEW TRIP'S STATUS FIELD TO "MATCHED" (n46) ---
+// Input:  New Trip
+// Action:
+//   - Set the new trip's `status` field to "matched".
+//   - Set the `isNewTripMatched` variable to `true`.
+
+// --- NEW TRIP DOCUMENT UPDATE: (n47) ---
+// Input: new trip, old trip.
+// Action:
+// - Add old trip to new trip's potential_trips array, marking properties as mentioned in diagram.
+
+// --- OLD TRIP DOCUMENT UPDATE: (n48) ---
+// Input:  Old Trip, New Trip
+// Action:
+//    - Add new trip to old trip's potential_trips array, marking properties as mentioned in diagram.
+
+// --- DOES NEW TRIP PROPER MATCH WITH OLD TRIPS RESERVING TRIP? (n49) ---
+// Input: new trip, old trip
+// Action: check if new trip proper match with old trip's reserving trip.
+// Output:
+//   - YES:  go to update new trip ( add to matched trips)
+//   - NO: go to update new trip (add to potential trips).
+
+//  --- NEW TRIP DOCUMENT UPDATE: (n50) ---
+// Input: new trip, old trip
+// Action: Add new matched_trips index.
+
+//  --- OLD TRIP DOCUMENT UPDATE: (n51) ---
+// Input: old trip, new trip
+// Action: Add new matched_trips index.
+
+// --- IS OLDTRIP A PROPER MATCH WITH NEW TRIP AND IS OLDTRIP NOT RESERVED (RESERVED = FALSE)? (n52) ---
+// Input:  New Trip, Current Old Trip
+// Action:
+//   - Check if `isProperMatch(newTrip, oldTrip)` returns true.
+//   - Check if `oldTrip.reserved == false`.
+// Output:
+//   - YES (both conditions are true):
+//   - NO (either condition is false):
+
+// --- IS OLDTRIP RESERVED? (n53) ---
+// Input: Old trip
+// Action:
+// - check if oldTrip.reserved is true.
+// Output:
+// - YES: go to check if new trip matches old trip's reserving trip.
+// - NO: update old and new trips (add to potential trips).
+
+//  --- DOES NEW TRIP MATCH OLD TRIP’S RESERVING TRIP? (n54) ---
+// Input: new trip, old trip
+// Action: check if new trip matches old trip's reserving trip
+// Output:
+//    - YES: update new trip (add to potential trip)
+//    - No: add old and new trips to potential trips.
+
+// --- UPDATE NEW AND OLD TRIPS, ADD TO POTENTIAL TRIPS (n55) ---
+// Input:  New Trip, Old Trip
+// Action:
+// -Add old trip to the new trip's potential_trips array with specific properties set.
+//      - Set mutual: true
+//      - Other fields initialized appropriately, including setting proper_match, reserving_trip_id, and others to false or null as indicated.
+
+// --- UPDATE NEW AND OLD TRIPS, ADD TO POTENTIAL TRIPS (n56) ---
+// Input:  New Trip, Old Trip
+// Action:
+// - Add new trip to old trip's `potential_trips` array.
+
+// --- UPDATE OLD AND NEW TRIPS, ADD TO POTENTIAL TRIPS (n57) ---
+// Input:  New Trip, Old Trip
+// Action:
+//   - Add the old trip to the new trip's `potential_trips` array, setting `mutual` to true and other flags/properties as indicated.
+
+// --- UPDATE OLD AND NEW TRIPS, ADD TO POTENTIAL TRIPS (n58) ---
+// Input:  New Trip, Old Trip
+// Action:
+//   - Add the new trip to the old trip's `potential_trips` array, setting `mutual` to true and other flags/properties as indicated.
+
+// --- UPDATE OLD AND NEW TRIPS, ADD TO POTENTIAL TRIPS (n59) ---
+// Input:  New Trip, Old Trip
+// Action:
+// - Add old trip to new trip's potential_trips.
+
+// Helper Function: isProperMatch(trip1, trip2)
+// Input: Two Trip objects, trip1 and trip2.
+// Action:
+//   - Calculate the geographic distance between trip1's pickup and trip2's pickup using Radar API (or a suitable distance calculation library).
+//   - Calculate the geographic distance between trip1's destination and trip2's destination.
+//   - Check if both distances are within the allowed radii (using trip1.pickup_radius, trip1.destination_radius, trip2.pickup_radius and trip2.destination_radius)
+// Output:
+//   - Returns `true` if both pickup and destination are within the allowed radii, `false` otherwise.
+
+//Note: the value "+++" means the value must be calculated.
