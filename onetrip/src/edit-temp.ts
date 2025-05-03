@@ -7,14 +7,19 @@ import {
   QueryDocumentSnapshot,
 } from "firebase-functions/v2/firestore";
 import * as admin from "firebase-admin";
-import { FieldValue, DocumentReference, Transaction, Timestamp, GeoPoint } from "firebase-admin/firestore";
+import { FieldValue, DocumentReference } from "firebase-admin/firestore";
 import {Trip, MatchedTrip, PotentialTrip, TripGroup, ObstructingTripMember, TripGroupInfo} from "../../type";
-import { properMatchGeometric, updateNestedTripField } from './utils/utils';
+import { properMatchGeometric, updateNestedTripField, getStoredDistances, properMatchArrayCheck, calculateGap, customArrayUnion, checkMemberUnknownToTrip } from './utils/utils';
+import { CloudTasksClient } from "@google-cloud/tasks";
+import { MarkOptions } from "perf_hooks";
 
 // Assuming admin SDK is initialized elsewhere
 // admin.initializeApp();
 const db = admin.firestore();
-
+const tasksClient = new CloudTasksClient();
+const TASKS_QUEUE_LOCATION = "us-central1"; // Or your function's region
+const TASKS_QUEUE_ID = "reservation-cascade-queue"; // Choose a name
+const TASKS_PROJECT_ID = process.env.GCLOUD_PROJECT || ''; // Get project ID automatically
 /**
  * Helper to find an index in matched_trips or potential_trips arrays.
  */
@@ -32,7 +37,7 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
     const beforeSnap = event.data?.before;
     const afterSnap = event.data?.after;
 
-    if (!beforeSnap?.exists() || !afterSnap?.exists()) {
+    if (!beforeSnap?.exists || !afterSnap?.exists) {
         logger.warn("Trip document snapshot missing before or after data.");
         return;
     }
@@ -45,13 +50,17 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
     const relevantFieldsChanged =
         editedTripBeforeData.pickup_radius !== editedTripAfterData.pickup_radius ||
         editedTripBeforeData.destination_radius !== editedTripAfterData.destination_radius ||
-        editedTripBeforeData.pickup_latlng?.lat !== editedTripAfterData.pickup_latlng?.lat ||
-        editedTripBeforeData.pickup_latlng?.lng !== editedTripAfterData.pickup_latlng?.lng ||
-        editedTripBeforeData.destination_latlng?.lat !== editedTripAfterData.destination_latlng?.lat ||
-        editedTripBeforeData.destination_latlng?.lng !== editedTripAfterData.destination_latlng?.lng ||
-        editedTripBeforeData.seat_count !== editedTripAfterData.seat_count ||
-        editedTripBeforeData.reserved !== editedTripAfterData.reserved || // Handle manual reservation changes?
-        editedTripBeforeData.reserving_trip_ref?.path !== editedTripAfterData.reserving_trip_ref?.path;
+        // editedTripBeforeData.pickup_latlng?.lat !== editedTripAfterData.pickup_latlng?.lat ||
+        // editedTripBeforeData.pickup_latlng?.lng !== editedTripAfterData.pickup_latlng?.lng ||
+        // editedTripBeforeData.destination_latlng?.lat !== editedTripAfterData.destination_latlng?.lat ||
+        // editedTripBeforeData.destination_latlng?.lng !== editedTripAfterData.destination_latlng?.lng ||
+        editedTripBeforeData.seat_count !== editedTripAfterData.seat_count
+        // editedTripBeforeData.reserved !== editedTripAfterData.reserved || // Handle manual reservation changes?
+        // editedTripBeforeData.reserving_trip_ref?.path !== editedTripAfterData.reserving_trip_ref?.path;
+
+    const radiusChanged = editedTripBeforeData.pickup_radius !== editedTripAfterData.pickup_radius || editedTripBeforeData.destination_radius !== editedTripAfterData.destination_radius;
+
+    const seatChanged = editedTripBeforeData.seat_count !== editedTripAfterData.seat_count;
 
     if (!relevantFieldsChanged) {
         logger.info("No relevant fields changed, skipping full re-evaluation.");
@@ -77,10 +86,12 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
             const editedTripData = editedTripSnap.data() as Trip; // Use this for current state checks
 
             // Keep track of updates needed for the edited trip
-            const editedTripUpdate: Record<string, any> = {};
+            const editedTripUpdate: Partial<Trip> = {};
+            editedTripUpdate.matched_trips = editedTripData.matched_trips || [] as MatchedTrip[]; // Start with current matched_trips
+            editedTripUpdate.potential_trips = editedTripData.potential_trips || [] as PotentialTrip[]; // Start with current potential_trips
 
             // --- Reservation Handling (n4 - n28) ---
-            const wasReservedBefore = editedTripBeforeData.reserved;
+            const wasReservedBefore = editedTripBeforeData.reserved; //question: do i check before or after
             const formerReservingTripRef = editedTripBeforeData.reserving_trip_ref; // Ref before the update
 
             if (wasReservedBefore && formerReservingTripRef) {
@@ -90,12 +101,13 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                     logger.warn(`Former reserving trip ${formerReservingTripRef.id} not found. Cleaning up reservation on ${editedTripRef.id}.`);
                     // Clean up dangling reservation on edited trip
                     editedTripUpdate.reserved = false;
-                    editedTripUpdate.reserving_trip_ref = FieldValue.delete();
+                    editedTripUpdate.reserving_trip_ref = FieldValue.delete() as any;
                     const formerReserverInMatchedIdx = findTripIndex(editedTripData.matched_trips, formerReservingTripRef);
                     if (formerReserverInMatchedIdx !== -1) {
                         // Ideally remove element, but FieldValue.arrayRemove needs exact object match
                         // Safer to reconstruct array or mark element for later removal logic outside transaction if complex
                         logger.warn(`Need to remove missing former reserver ${formerReservingTripRef.id} from matched_trips of ${editedTripRef.id}`);
+                        editedTripUpdate.matched_trips.splice(formerReserverInMatchedIdx, 1); // Remove from matched_trips
                         // Potential simple fix: Overwrite array later if other changes occur
                         // For now, proceed assuming it might get handled by other logic moving it to potential
                     }
@@ -104,7 +116,14 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                     const formerReservingTripData = formerReservingTripSnap.data() as Trip;
 
                     // n5: Does edited trip still proper match its *former* reserving trip?
-                    const stillMatchesFormerReserver = properMatchGeometric(editedTripData, formerReservingTripData);
+                    let stillMatchesFormerReserver;
+                    if (radiusChanged) {
+                        const distance = getStoredDistances(editedTripData, formerReservingTripRef);
+                        if (!distance) {
+                            throw new Error(`Distance data not found for ${editedTripRef.id} and former reserver ${formerReservingTripRef.id}.`);
+                        }
+                        stillMatchesFormerReserver = properMatchGeometric(editedTripData, formerReservingTripData, distance?.pickupDistance, distance?.destinationDistance);
+                    } else stillMatchesFormerReserver = properMatchArrayCheck(editedTripData, formerReservingTripData);
 
                     if (stillMatchesFormerReserver) {
                         // n6: Still matches, remains reserved (by this trip)
@@ -116,36 +135,38 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                         logger.info(`Trip ${editedTripRef.id} NO LONGER matches former reserver ${formerReservingTripRef.id}. Breaking reservation.`);
                         // n8: Update Edited Trip - Remove reservation details
                         editedTripUpdate.reserved = false;
-                        editedTripUpdate.reserving_trip_ref = FieldValue.delete();
+                        editedTripUpdate.reserving_trip_ref = FieldValue.delete() as any;
 
                         // Find and remove former reserving trip from edited trip's matched_trips
-                        const currentMatchedTrips = [...(editedTripData.matched_trips || [])];
-                        const reserverIndexInET = findTripIndex(currentMatchedTrips, formerReservingTripRef);
-                        let removedReserverElement: MatchedTrip | null = null;
+                        const reserverIndexInET = findTripIndex(editedTripUpdate.matched_trips, formerReservingTripRef);
                         if (reserverIndexInET !== -1) {
-                            removedReserverElement = currentMatchedTrips.splice(reserverIndexInET, 1)[0];
-                            editedTripUpdate.matched_trips = currentMatchedTrips; // Update the array
+                            editedTripUpdate.matched_trips.splice(reserverIndexInET, 1); // Update the array
                             logger.info(`Removed former reserver ${formerReservingTripRef.id} from matched_trips of ${editedTripRef.id}.`);
                         } else {
                              logger.warn(`Former reserver ${formerReservingTripRef.id} not found in matched_trips of ${editedTripRef.id} for removal.`);
                         }
 
                         // n9: Update Former Reserving Trip
-                        const formerReserverUpdate: Record<string, any> = {};
-                        const formerReserverMatched = [...(formerReservingTripData.matched_trips || [])];
-                        const etIndexInReserverMatched = findTripIndex(formerReserverMatched, editedTripRef);
-                        let etElementFromReserver: MatchedTrip | null = null;
+                        const formerReserverUpdate: Partial<Trip> = {};
+                        formerReserverUpdate.matched_trips = [...(formerReservingTripData.matched_trips || [])];
+                        formerReserverUpdate.potential_trips = [...(formerReservingTripData.potential_trips || [])]; // Start with current potential_trips
+                        const etIndexInReserverMatched = findTripIndex(formerReserverUpdate.matched_trips, editedTripRef);
+                        const etElementFromReserver: MatchedTrip | null = formerReserverUpdate.matched_trips[etIndexInReserverMatched];
                         if (etIndexInReserverMatched !== -1) {
-                            etElementFromReserver = formerReserverMatched.splice(etIndexInReserverMatched, 1)[0];
-                            formerReserverUpdate.matched_trips = formerReserverMatched;
+                            formerReserverUpdate.matched_trips.splice(etIndexInReserverMatched, 1);
+
                             logger.info(`Removed ET ${editedTripRef.id} from matched_trips of former reserver ${formerReservingTripRef.id}.`);
                         } else {
                              logger.warn(`ET ${editedTripRef.id} not found in matched_trips of former reserver ${formerReservingTripRef.id} for removal.`);
                         }
 
                         // Add ET to former reserver's potential_trips
-                        const pd = etElementFromReserver?.pickup_distance ?? distanceBetween(formerReservingTripData.pickup_latlng, editedTripData.pickup_latlng);
-                        const dd = etElementFromReserver?.destination_distance ?? distanceBetween(formerReservingTripData.destination_latlng, editedTripData.destination_latlng);
+                        const pd = etElementFromReserver?.pickup_distance;
+                        const dd = etElementFromReserver?.destination_distance;
+                        if (!pd || !dd) {
+                            logger.warn(`Pickup or destination distance missing for ET ${editedTripRef.id} in former reserver's matched_trips.`);
+                            throw new Error(`Pickup or destination distance missing for ET ${editedTripRef.id} in former reserver's matched_trips.`);
+                        }
                         const etPotentialEntryForReserver: PotentialTrip = {
                             trip_ref: editedTripRef,
                             paid: false, // ET is no longer part of the paid group
@@ -163,14 +184,14 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                             group_largest_destination_overlap_gap: null, // N/A for non-group check
                             unknown_trip_obstruction: false,
                             total_seat_count: null, // N/A
-                            // seat_count: editedTripData.seat_count // Add if needed by schema
+                            seat_count: editedTripData.seat_count // Add if needed by schema
                         };
-                        formerReserverUpdate.potential_trips = FieldValue.arrayUnion(etPotentialEntryForReserver);
+                        customArrayUnion(formerReserverUpdate.potential_trips, etPotentialEntryForReserver); // Use custom function to avoid duplicates
                         logger.info(`Adding ET ${editedTripRef.id} to potential_trips of former reserver ${formerReservingTripRef.id}.`);
 
 
                         // n10: Does former reserving trip have other matches left?
-                        const hasOtherMatches = formerReserverMatched.length > 0;
+                        const hasOtherMatches = formerReserverUpdate.matched_trips.length > 0;
 
                         if (hasOtherMatches) {
                             logger.info(`Former reserver ${formerReservingTripRef.id} has other matches.`);
@@ -190,13 +211,14 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                                 seat_obstruction: false, // Assume check not needed or done later
                                 reserving_trip_obstruction: false, // Former reserver isn't reserved itself
                                 mutual: true, // Bidirectional potential
-                                group_largest_pickup_overlap_gap: gapP > 0 ? gapP : null,
-                                group_largest_destination_overlap_gap: gapD > 0 ? gapD : null,
+                                group_largest_pickup_overlap_gap: gapP !== null && gapP > 0 ? gapP : null,
+                                group_largest_destination_overlap_gap: gapD !== null && gapD > 0 ? gapD : null,
                                 unknown_trip_obstruction: false,
                                 total_seat_count: formerReservingTripData.total_seat_count ?? formerReservingTripData.seat_count, // Use TG count if available
-                                // seat_count: formerReservingTripData.seat_count // Add if needed
+                                seat_count: formerReservingTripData.seat_count // Add if needed
                              };
-                            editedTripUpdate.potential_trips = FieldValue.arrayUnion(potentialEntryForET);
+                            // editedTripUpdate.matched_trips = editedTripUpdate.matched_trips?.filter(mt => mt.trip_ref?.path !== formerReservingTripRef.path); // Remove former reserving trip from matched_trips
+                            customArrayUnion(editedTripUpdate.potential_trips, potentialEntryForET); // Use custom function to avoid duplicates
                             logger.info(`Adding former reserver ${formerReservingTripRef.id} to potential_trips of ET ${editedTripRef.id} (as paid).`);
 
 
@@ -205,7 +227,7 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                             let minCombinedDistance = Infinity;
                             let tiedRefs: DocumentReference[] = [];
 
-                            for (const match of formerReserverMatched) {
+                            for (const match of formerReserverUpdate.matched_trips) {
                                 const combinedDistance = match.pickup_distance + match.destination_distance;
                                 if (combinedDistance < minCombinedDistance) {
                                     minCombinedDistance = combinedDistance;
@@ -218,8 +240,10 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
 
                             // n17: Handle ties (Graph unclear, pick first for now)
                             if (tiedRefs.length > 1) {
-                                logger.warn(`Tie detected for new reservation target for ${formerReservingTripRef.id}. Picking first: ${nearestTripRef?.id}`);
+                                logger.warn(`Tie detected for new reservation target for ${formerReservingTripRef.id}. Picking random: ${nearestTripRef?.id}`);
                                 // n19 -> n20 equivalent
+                                const randomIndex = Math.floor(Math.random() * tiedRefs.length);
+                                nearestTripRef = tiedRefs[randomIndex];
                             }
 
                             if (nearestTripRef) {
@@ -235,13 +259,9 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
 
 
                                 // n21: Update Former Reserving Trip's matched_trips entry
-                                const reserverMatchedUpdate = formerReserverUpdate.matched_trips as MatchedTrip[] || [...formerReserverMatched]; // Use array from update obj if exists, else the one we modified
-                                const newReserveeIndex = findTripIndex(reserverMatchedUpdate, nearestTripRef);
+                                const newReserveeIndex = findTripIndex(formerReserverUpdate.matched_trips, nearestTripRef);
                                 if (newReserveeIndex !== -1) {
-                                     // Cannot directly update nested field with transaction.update AND arrayUnion/Remove
-                                     // Need to overwrite the whole array if modifying nested field.
-                                     reserverMatchedUpdate[newReserveeIndex].reserving = true;
-                                     formerReserverUpdate.matched_trips = reserverMatchedUpdate;
+                                     formerReserverUpdate.matched_trips[newReserveeIndex].reserving = true; // Update reserving field
                                      logger.info(`Updated former reserver ${formerReservingTripRef.id}: set reserving=true for match ${newlyReservedTripId}.`);
 
                                 } else {
@@ -253,6 +273,41 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                                 // Consider deferring this to a separate triggered function or queue.
                                 // For this implementation, we'll log the need but skip the deep cascade for brevity and stability.
                                 logger.warn(`DEFERRED ACTION: Cascade updates (n22-n28) needed for trips related to ${newlyReservedTripId} due to new reservation by ${formerReservingTripRef.id}. Implement in a separate process.`);
+
+                                 // *** DEFER n22-n28 using Cloud Tasks ***
+                                const queuePath = tasksClient.queuePath(TASKS_PROJECT_ID, TASKS_QUEUE_LOCATION, "reservation-cascade-queue");
+                                 const taskPayload = {
+                                     newlyReservedTripPath: nearestTripRef.path,
+                                     reservingTripPath: formerReservingTripRef.path,
+                                };
+                                const task = {
+                                    httpRequest: {
+                                        httpMethod: 'POST' as const,
+                                        // URL of the handleReservationCascade HTTP function
+                                        // Get this from `firebase functions:list` or construct it:
+                                        // `https://${TASKS_QUEUE_LOCATION}-${TASKS_PROJECT_ID}.cloudfunctions.net/handleReservationCascade`
+                                        // Needs service account with invoker role. For simplicity using OIDC token:
+                                        url: `https://${TASKS_QUEUE_LOCATION}-${TASKS_PROJECT_ID}.cloudfunctions.net/handleReservationCascade`, // Replace with your function URL if different
+                                        body: Buffer.from(JSON.stringify(taskPayload)).toString('base64'),
+                                        headers: { 'Content-Type': 'application/json' },
+                                        oidcToken: { // Use OIDC for authentication if function requires it
+                                            serviceAccountEmail: process.env.FUNCTIONS_EMULATOR ? // Use default for emulator or deployed function's SA
+                                                'firebase-auth-emulator@example.com' :
+                                                `${TASKS_PROJECT_ID}@appspot.gserviceaccount.com`, // Replace if using a custom SA
+                                        },
+                                    },
+                                    // Optional: scheduleTime, dispatchDeadline, etc.
+                                    // scheduleTime: { seconds: Date.now() / 1000 + 60 } // Schedule 1 min in future
+                                };
+
+                                try {
+                                    await tasksClient.createTask({ parent: queuePath, task });
+                                    logger.info(`Enqueued reservation cascade task for newlyReserved: ${nearestTripRef.id}, reserver: ${formerReservingTripRef.id}`);
+                                } catch (taskError) {
+                                    logger.error(`Failed to enqueue reservation cascade task:`, taskError);
+                                    // Decide if this should fail the transaction. Usually no, just log it.
+                                }
+                                // *** End Deferral ***
 
                             } else {
                                  logger.warn(`Former reserver ${formerReservingTripRef.id} had matches but none could be selected for reservation.`);
@@ -284,55 +339,77 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                                 group_largest_destination_overlap_gap: null, // N/A
                                 unknown_trip_obstruction: false,
                                 total_seat_count: null, // N/A
-                                // seat_count: formerReservingTripData.seat_count // Add if needed
+                                seat_count: formerReservingTripData.seat_count // Add if needed
                              };
-                             editedTripUpdate.potential_trips = FieldValue.arrayUnion(potentialEntryForETUnpaid);
+                             customArrayUnion(editedTripUpdate.potential_trips, potentialEntryForETUnpaid); // Use custom function to avoid duplicates
                              logger.info(`Adding former reserver ${formerReservingTripRef.id} to potential_trips of ET ${editedTripRef.id} (as unpaid).`);
 
 
                             // n14: Update Former Reserving Trip status and fields
                             formerReserverUpdate.status = "unmatched";
-                            formerReserverUpdate.trip_group_ref = FieldValue.delete();
-                            formerReserverUpdate.time_of_payment = FieldValue.delete();
-                            formerReserverUpdate.total_seat_count = FieldValue.delete();
+                            formerReserverUpdate.trip_group_ref = FieldValue.delete() as any;
+                            formerReserverUpdate.time_of_payment = FieldValue.delete() as any;
+                            formerReserverUpdate.total_seat_count = FieldValue.delete() as any;
                             logger.info(`Updating former reserver ${formerReservingTripRef.id} to unmatched status.`);
 
                             // n18: Update trips that had former reserver as potential (paid)
                             // Again, complex cascade. Deferring.
-                             logger.warn(`DEFERRED ACTION: Cascade updates (n18) needed for trips that had ${formerReservingTripRef.id} as a paid potential match. Implement in a separate process.`);
+                            const queuePathN18 = tasksClient.queuePath(TASKS_PROJECT_ID, TASKS_QUEUE_LOCATION, "potential-unmatch-cascade-queue"); // Use NEW queue ID
+                            const taskPayloadN18 = {
+                                formerReservingTripPath: formerReservingTripRef.path, // Send path of the trip that became unmatched
+                            };
+                            const taskN18 = {
+                                httpRequest: {
+                                    httpMethod: 'POST' as const,
+                                    // URL of the NEW handlePotentialPaidUnmatchCascade HTTP function
+                                    url: `https://${TASKS_QUEUE_LOCATION}-${TASKS_PROJECT_ID}.cloudfunctions.net/handlePotentialPaidUnmatchCascade`, // Adjust URL if needed
+                                    body: Buffer.from(JSON.stringify(taskPayloadN18)).toString('base64'),
+                                    headers: { 'Content-Type': 'application/json' },
+                                    oidcToken: {
+                                        serviceAccountEmail: process.env.FUNCTIONS_EMULATOR ?
+                                            'firebase-auth-emulator@example.com' :
+                                            `${TASKS_PROJECT_ID}@appspot.gserviceaccount.com`, // Use correct SA email
+                                    },
+                                },
+                                // Optional: scheduleTime, etc.
+                            };
+
+                            try {
+                                await tasksClient.createTask({ parent: queuePathN18, task: taskN18 });
+                                logger.info(`Enqueued potential paid cascade task (n18) for former reserver: ${formerReservingTripRef.id}`);
+                            } catch (taskError) {
+                                logger.error(`Failed to enqueue potential paid cascade task (n18):`, taskError);
+                                // Decide if this should fail the transaction. Usually no.
+                            }
+                            // *** End Deferral n18 ***
                         }
                          // Apply updates to the former reserving trip
                         transaction.update(formerReservingTripRef, formerReserverUpdate);
                     }
                 }
             } // End if (wasReservedBefore && formerReservingTripRef)
-
+            
             // --- Process Unpaid Matched Trips (n29 - n60) ---
             logger.info(`Processing unpaid matched trips for ${editedTripRef.id}`);
-            const unpaidMatchedTripsBefore = (editedTripBeforeData.matched_trips || []).filter(t => !t.paid);
             const currentPotentialRefs = new Set((editedTripData.potential_trips || []).map(pt => pt.trip_ref.path)); // Track trips already potential
-
+            
             // Use editedTripData.matched_trips for current state if reservation logic didn't modify it yet
-            let currentMatchedForUnpaidCheck = editedTripUpdate.matched_trips
-                ? [...editedTripUpdate.matched_trips]
-                : [...(editedTripData.matched_trips || [])];
-
-            const nextMatchedForUnpaidCheck: MatchedTrip[] = []; // Build the next state of matched trips array
-
+            let currentMatchedForUnpaidCheck = editedTripData.matched_trips || [];
+            
             for (const umtElement of currentMatchedForUnpaidCheck) {
-                 if (umtElement.paid) {
-                     nextMatchedForUnpaidCheck.push(umtElement); // Keep paid matches for now
-                     continue; // Only process unpaid here
-                 }
-
+                if (!editedTripUpdate.potential_trips) {
+                    editedTripUpdate.potential_trips = [];
+                }
+                if (!editedTripUpdate.matched_trips) {
+                    editedTripUpdate.matched_trips = [];
+                }
+                if (umtElement.paid) {
+                    continue; // Only process unpaid here
+                }
+                
                 const umtRef = umtElement.trip_ref;
                 if (!umtRef) continue; // Skip if ref is missing
-
-                // Skip if this trip was the former reserver we already processed
-                if (formerReservingTripRef && umtRef.path === formerReservingTripRef.path && !stillMatchesFormerReserver) {
-                     logger.info(`Skipping unpaid matched trip ${umtRef.id} as it was the former reserver and already handled.`);
-                     continue;
-                }
+                const umtIndexInETMatched = findTripIndex(editedTripUpdate.matched_trips, umtRef);
 
                 const umtSnap = await transaction.get(umtRef);
                 if (!umtSnap.exists) {
@@ -341,7 +418,7 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                     continue;
                 }
                 const umtData = umtSnap.data() as Trip;
-
+                
                 // n31: Does edited trip proper match UMT (based on updated values)?
                 const matchesUMT = properMatchGeometric(editedTripData, umtData, umtElement.pickup_distance, umtElement.destination_distance);
 
@@ -352,10 +429,15 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                     // n45: Is UMT reserved?
                     if (umtData.reserved && umtData.reserving_trip_ref) {
                         // n47: Does ET proper match UMT's reserving trip?
+                        if (umtData.trip_id === newlyReservedTripId) {
+                            isObstructedByUMTReservation = true;
+                            return; // Skip further checks, already handled in reservation logic
+                        }
                         const umtReserverSnap = await transaction.get(umtData.reserving_trip_ref);
                         if (umtReserverSnap.exists) {
                             const umtReserverData = umtReserverSnap.data() as Trip;
-                            if (!properMatchGeometric(editedTripData, umtReserverData)) {
+                            const distances = getStoredDistances(editedTripData, umtData.reserving_trip_ref);
+                            if (!distances || !properMatchGeometric(editedTripData, umtReserverData, distances?.pickupDistance, distances?.destinationDistance)) {
                                 logger.info(`ET ${editedTripRef.id} does NOT match UMT ${umtRef.id}'s reserver ${umtData.reserving_trip_ref.id}.`);
                                 // n46: Conflict. Move UMT to ET's potential.
                                 isObstructedByUMTReservation = true;
@@ -375,98 +457,199 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                     }
 
                     if (isObstructedByUMTReservation) {
-                         // n46 Follow-up: Move UMT to ET's potential
-                         const potentialEntryForET: PotentialTrip = {
-                             trip_ref: umtRef,
-                             paid: false,
-                             trip_group_ref: null,
-                             pickup_radius: umtData.pickup_radius,
-                             destination_radius: umtData.destination_radius,
-                             pickup_distance: umtElement.pickup_distance,
-                             destination_distance: umtElement.destination_distance,
-                             proper_match: true, // It matches geometrically
-                             trip_obstruction: false, // N/A for unpaid
-                             seat_obstruction: false, // N/A for unpaid
-                             reserving_trip_obstruction: true, // Obstructed by UMT's reservation
-                             mutual: umtElement.mutual, // Preserve original mutual status temporarily
-                             group_largest_pickup_overlap_gap: null,
-                             group_largest_destination_overlap_gap: null,
-                             unknown_trip_obstruction: false,
-                             total_seat_count: null,
-                             // seat_count: umtData.seat_count // Add if needed
-                         };
-                         editedTripUpdate.potential_trips = FieldValue.arrayUnion(potentialEntryForET);
-                         currentPotentialRefs.add(umtRef.path); // Track addition
-                         logger.info(`Moved UMT ${umtRef.id} from matched to potential for ET ${editedTripRef.id} due to reservation conflict.`);
+                        // ET matches UMT geometrically, but UMT's reservation causes conflict.
 
-                         // Also update UMT: Move ET to potential
+                        // --- Update ET: Move UMT to potential_trips ---
+                        const originalMutual = umtElement.mutual; // Mutual status before this edit cycle
+
+                        // Determine the new mutual status for the potential entry on ET's side
+                        let newMutualForETPotential: boolean;
+                        if (!originalMutual && currentlyReservedByEdit) {
+                            // Case: Originally NOT mutual AND ET IS currently reserved
+                            newMutualForETPotential = true;
+                        } else {
+                            // Case: Originally mutual OR (Originally NOT mutual AND ET is NOT currently reserved)
+                            newMutualForETPotential = false;
+                        }
+
+                        const potentialEntryForET: PotentialTrip = {
+                            trip_ref: umtRef,
+                            paid: false,
+                            trip_group_ref: null,
+                            pickup_radius: umtData.pickup_radius,
+                            destination_radius: umtData.destination_radius,
+                            pickup_distance: umtElement.pickup_distance,
+                            destination_distance: umtElement.destination_distance,
+                            proper_match: true, // Matches geometrically
+                            trip_obstruction: false,
+                            seat_obstruction: false,
+                            reserving_trip_obstruction: true, // Obstructed by UMT's reservation
+                            mutual: newMutualForETPotential, // Set calculated mutual status
+                            group_largest_pickup_overlap_gap: null,
+                            group_largest_destination_overlap_gap: null,
+                            unknown_trip_obstruction: false,
+                            total_seat_count: null,
+                            seat_count: umtData.seat_count // Add if needed
+                        };
+                        // Use arrayUnion to add, avoids duplicates if somehow already there
+                        customArrayUnion(editedTripUpdate.potential_trips, potentialEntryForET); // Use custom function to avoid duplicates
+                        editedTripUpdate.matched_trips?.splice(umtIndexInETMatched, 1); // Remove from matched_trips
+                        currentPotentialRefs.add(umtRef.path); // Track addition
+                        logger.info(`Moved UMT ${umtRef.id} to potential for ET ${editedTripRef.id} due to reservation conflict (mutual set to ${newMutualForETPotential}).`);
+
+
+                        // --- Update UMT based on original mutual status ---
+                        const umtUpdate: Record<string, any> = {};
+
+                        if (originalMutual) {
+                            // UMT should have ET in its matched_trips. Update it there.
+                            logger.info(`Updating ET's entry in UMT ${umtRef.id}'s matched_trips (original mutual was true).`);
+                            const umtMatched = [...(umtData.matched_trips || [])];
+                            const etIndexInUMTMatched = findTripIndex(umtMatched, editedTripRef);
+
+                            if (etIndexInUMTMatched !== -1) {
+                                // Update radii and set mutual to false
+                                updateNestedTripField(umtUpdate, "matched_trips", etIndexInUMTMatched, "pickup_radius", editedTripData.pickup_radius);
+                                updateNestedTripField(umtUpdate, "matched_trips", etIndexInUMTMatched, "destination_radius", editedTripData.destination_radius);
+                                updateNestedTripField(umtUpdate, "matched_trips", etIndexInUMTMatched, "mutual", false); // ET no longer sees UMT as matched
+                                logger.info(`-- Updated radii and set mutual=false for ET ${editedTripRef.id} in UMT ${umtRef.id}'s matched_trips.`);
+                            } else {
+                                logger.warn(`-- ET ${editedTripRef.id} not found in UMT ${umtRef.id}'s matched_trips for update, despite original mutual=true.`);
+                                // Potential inconsistency, log it. Maybe it was already removed?
+                            }
+                        } else {
+                            // Original mutual was false. UMT should have ET in its potential_trips.
+                            logger.info(`Updating ET's entry in UMT ${umtRef.id}'s potential_trips (original mutual was false).`);
+                            const umtPotential = [...(umtData.potential_trips || [])];
+                            const etIndexInUMTPotential = findTripIndex(umtPotential, editedTripRef);
+
+                            if (etIndexInUMTPotential !== -1) {
+                                if (currentlyReservedByEdit) {
+                                    // ET IS reserved. Update ET in UMT's potential, set mutual=true.
+                                    logger.info(`-- ET ${editedTripRef.id} is reserved. Updating radii and setting mutual=true in UMT's potential_trips.`);
+                                    updateNestedTripField(umtUpdate, "potential_trips", etIndexInUMTPotential, "pickup_radius", editedTripData.pickup_radius);
+                                    updateNestedTripField(umtUpdate, "potential_trips", etIndexInUMTPotential, "destination_radius", editedTripData.destination_radius);
+                                    updateNestedTripField(umtUpdate, "potential_trips", etIndexInUMTPotential, "mutual", true); // ET now also sees UMT as potential
+                                } else {
+                                    // ET is NOT reserved. Move ET from UMT's potential to matched, mutual=false.
+                                    logger.info(`-- ET ${editedTripRef.id} is not reserved. Moving from potential to matched in UMT.`);
+                                    const potentialElementToRemove = umtPotential[etIndexInUMTPotential]; // Get the exact element to remove
+
+                                    const newMatchedEntryForUMT: MatchedTrip = {
+                                        trip_ref: editedTripRef,
+                                        paid: false,
+                                        trip_group_ref: null,
+                                        pickup_radius: editedTripData.pickup_radius, // Updated radii
+                                        destination_radius: editedTripData.destination_radius, // Updated radii
+                                        pickup_distance: potentialElementToRemove.pickup_distance, // Keep original distance
+                                        destination_distance: potentialElementToRemove.destination_distance, // Keep original distance
+                                        mutual: false, // As requested
+                                        reserving: false,
+                                        seat_count: editedTripData.seat_count // Add if needed
+                                    };
+                                    // Use atomic array operations
+                                    umtUpdate.potential_trips = FieldValue.arrayRemove(potentialElementToRemove);
+                                    umtUpdate.matched_trips = FieldValue.arrayUnion(newMatchedEntryForUMT);
+                                    const umtMatchedBefore = umtData.matched_trips;
+                                    if (umtMatchedBefore.length === 0) {
+                                        // n43: Update UMT status to unmatched
+                                        transaction.update(umtRef, { status: "matched" });
+                                        logger.info(`Set UMT ${umtRef.id} status to matched.`);
+                                    }
+                                }
+                            } else {
+                                logger.warn(`-- ET ${editedTripRef.id} not found in UMT ${umtRef.id}'s potential_trips for update, despite original mutual=false.`);
+                                // Potential inconsistency.
+                            }
+                        }
+
+                        // Apply updates to UMT if any changes were prepared
+                        if (Object.keys(umtUpdate).length > 0) {
+                            transaction.update(umtRef, umtUpdate);
+                        } else {
+                             logger.info(`-- No updates needed for UMT ${umtRef.id} based on ET ${editedTripRef.id}'s state.`);
+                        }
+
+                    } else { // This 'else' corresponds to 'if (isObstructedByUMTReservation)'
+                         // ET matches UMT and is NOT obstructed by UMT's reservation.
+                         // Original logic for this path (n48 ->) should remain here.
+                         // Update radii on UMT's matched entry, handle mutual sync based on ET reservation.
+
+                         logger.info(`ET ${editedTripRef.id} still matches UMT ${umtRef.id} and is not obstructed by reservation.`);
+                         matched = true; // Remains matched from ET's perspective
+
+                         // Update radii and potentially mutual on UMT's matched entry for ET
                          const umtUpdate: Record<string, any> = {};
-                         const etPotentialEntryForUMT: PotentialTrip = {
-                             trip_ref: editedTripRef,
-                             paid: false,
-                             trip_group_ref: null,
-                             pickup_radius: editedTripData.pickup_radius,
-                             destination_radius: editedTripData.destination_radius,
-                             pickup_distance: umtElement.pickup_distance,
-                             destination_distance: umtElement.destination_distance,
-                             proper_match: true,
-                             trip_obstruction: false,
-                             seat_obstruction: false,
-                             reserving_trip_obstruction: false, // UMT not obstructed by ET's reservation here
-                             mutual: umtElement.mutual,
-                             group_largest_pickup_overlap_gap: null,
-                             group_largest_destination_overlap_gap: null,
-                             unknown_trip_obstruction: false,
-                             total_seat_count: null,
-                              // seat_count: editedTripData.seat_count // Add if needed
-                         };
-                         umtUpdate.potential_trips = FieldValue.arrayUnion(etPotentialEntryForUMT);
-                         // Remove ET from UMT's matched
-                         umtUpdate.matched_trips = FieldValue.arrayRemove({
-                             // Must match EXACTLY - This is tricky, better to fetch and rebuild array
-                             trip_ref: editedTripRef,
-                             paid: umtElement.paid, // Should be false
-                             trip_group_ref: umtElement.trip_group_ref, // Should be null
-                             pickup_radius: editedTripBeforeData.pickup_radius, // Use BEFORE data for removal match
-                             destination_radius: editedTripBeforeData.destination_radius, // Use BEFORE data for removal match
-                             pickup_distance: umtElement.pickup_distance,
-                             destination_distance: umtElement.destination_distance,
-                             mutual: umtElement.mutual,
-                             reserving: false // Assuming ET wasn't reserving UMT
-                         });
-                         transaction.update(umtRef, umtUpdate);
-                         logger.info(`Moved ET ${editedTripRef.id} from matched to potential for UMT ${umtRef.id}.`);
+                         const originalMutual = umtElement.mutual;
 
-                    } else {
-                         // n48 -> Path: Remains matched, update radii on UMT side
-                         const umtUpdate: Record<string, any> = {};
-                         const umtMatched = [...(umtData.matched_trips || [])];
-                         const etIndexInUMT = findTripIndex(umtMatched, editedTripRef);
-                         if (etIndexInUMT !== -1) {
-                             // n54/n134 logic: Update radii
-                             umtMatched[etIndexInUMT].pickup_radius = editedTripData.pickup_radius;
-                             umtMatched[etIndexInUMT].destination_radius = editedTripData.destination_radius;
+                         if (originalMutual) {
+                            // UMT should have ET in its matched_trips. Update it there.
+                            logger.info(`Updating ET's entry in UMT ${umtRef.id}'s matched_trips (original mutual was true).`);
+                            const umtMatched = [...(umtData.matched_trips || [])];
+                            const etIndexInUMTMatched = findTripIndex(umtMatched, editedTripRef);
+                            
+                            if (etIndexInUMTMatched !== -1) {
+                                // Update radii and set mutual to false
+                                updateNestedTripField(umtUpdate, "matched_trips", etIndexInUMTMatched, "pickup_radius", editedTripData.pickup_radius);
+                                updateNestedTripField(umtUpdate, "matched_trips", etIndexInUMTMatched, "destination_radius", editedTripData.destination_radius);
+                                logger.info(`-- Updated radii for ET ${editedTripRef.id} in UMT ${umtRef.id}'s matched_trips.`);
+                            } else {
+                                logger.warn(`-- ET ${editedTripRef.id} not found in UMT ${umtRef.id}'s matched_trips for update, despite original mutual=true.`);
+                                // Potential inconsistency, log it. Maybe it was already removed?
+                            }
+                        } else {
+                            // Original mutual was false. UMT should have ET in its potential_trips.
+                            logger.info(`Updating ET's entry in UMT ${umtRef.id}'s potential_trips (original mutual was false).`);
+                            const umtPotential = [...(umtData.potential_trips || [])];
+                            const etIndexInUMTPotential = findTripIndex(umtPotential, editedTripRef);
+                            const umtIndexInETMatched = findTripIndex(currentMatchedForUnpaidCheck, umtRef)
 
-                             // Handle mutual changes if needed (n49/n51) - GraphML seems inconsistent here
-                             // If !umtElement.mutual && !currentlyReservedByEdit (n49->false), make mutual
-                             if (!umtElement.mutual && !currentlyReservedByEdit) {
-                                 logger.info(`Making ET ${editedTripRef.id} and UMT ${umtRef.id} mutual.`);
-                                 umtMatched[etIndexInUMT].mutual = true;
-                                 // Update ET's side too
-                                 umtElement.mutual = true; // Modify the element that will be pushed below
-                             }
-                             // else (n49->true or n50->yes) - just update radii (already done above)
+                            if (etIndexInUMTPotential !== -1) {
+                                if (currentlyReservedByEdit) {
+                                    // ET IS reserved. Update ET in UMT's potential, set mutual=true.
+                                    logger.info(`-- ET ${editedTripRef.id} is reserved. Updating radii in UMT's potential_trips.`);
+                                    updateNestedTripField(umtUpdate, "potential_trips", etIndexInUMTPotential, "pickup_radius", editedTripData.pickup_radius);
+                                    updateNestedTripField(umtUpdate, "potential_trips", etIndexInUMTPotential, "destination_radius", editedTripData.destination_radius);
+                                } else {
+                                    // ET is NOT reserved. Move ET from UMT's potential to matched, mutual=false.
+                                    logger.info(`-- ET ${editedTripRef.id} is not reserved. Moving from potential to matched in UMT.`);
+                                    const potentialElementToRemove = umtPotential[etIndexInUMTPotential]; // Get the exact element to remove
 
-                             umtUpdate.matched_trips = umtMatched; // Overwrite array with updated radii/mutual
-                             transaction.update(umtRef, umtUpdate);
-                             logger.info(`Updated radii/mutual for ET ${editedTripRef.id} in UMT ${umtRef.id}'s matched_trips.`);
-                         } else {
-                              logger.warn(`ET ${editedTripRef.id} not found in UMT ${umtRef.id}'s matched_trips for radius update.`);
-                              // Might happen if UMT had ET in potential, requires different logic (n55 path) - Graph is complex.
-                              // For simplicity, assume if matched now, it was matched before.
-                         }
-                         // Keep the updated element in ET's matched list
-                         nextMatchedForUnpaidCheck.push(umtElement);
+                                    const newMatchedEntryForUMT: MatchedTrip = {
+                                        trip_ref: editedTripRef,
+                                        paid: false,
+                                        trip_group_ref: null,
+                                        pickup_radius: editedTripData.pickup_radius, // Updated radii
+                                        destination_radius: editedTripData.destination_radius, // Updated radii
+                                        pickup_distance: potentialElementToRemove.pickup_distance, // Keep original distance
+                                        destination_distance: potentialElementToRemove.destination_distance, // Keep original distance
+                                        mutual: true, // As requested
+                                        reserving: false,
+                                        seat_count: editedTripData.seat_count // Add if needed
+                                    };
+                                    // Use atomic array operations
+                                    umtUpdate.potential_trips = FieldValue.arrayRemove(potentialElementToRemove);
+                                    umtUpdate.matched_trips = FieldValue.arrayUnion(newMatchedEntryForUMT);
+                                    editedTripUpdate.matched_trips[umtIndexInETMatched].mutual = true; // Set mutual to true on ET's matched entry
+                                    const umtMatchedBefore = umtData.matched_trips;
+                                    if (umtMatchedBefore.length === 0) {
+                                        // n43: Update UMT status to unmatched
+                                        transaction.update(umtRef, { status: "matched" });
+                                        logger.info(`Set UMT ${umtRef.id} status to matched.`);
+                                    }
+                                }
+                            } else {
+                                logger.warn(`-- ET ${editedTripRef.id} not found in UMT ${umtRef.id}'s potential_trips for update, despite original mutual=false.`);
+                                // Potential inconsistency.
+                            }
+                        }
+
+                        // Apply updates to UMT if any changes were prepared
+                        if (Object.keys(umtUpdate).length > 0) {
+                            transaction.update(umtRef, umtUpdate);
+                        } else {
+                             logger.info(`-- No updates needed for UMT ${umtRef.id} based on ET ${editedTripRef.id}'s state.`);
+                        }
                     }
 
                 } else {
@@ -476,10 +659,15 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                     // n33: Is UMT reserved?
                     if (umtData.reserved && umtData.reserving_trip_ref) {
                         // n34: Does ET proper match UMT's reserving trip?
+                        if (umtData.reserving_trip_ref.id === newlyReservedTripId) {
+                            isReservingTripObstruction = true;
+                            return; // Skip further checks, already handled in reservation logic
+                        }
                          const umtReserverSnap = await transaction.get(umtData.reserving_trip_ref);
                          if (umtReserverSnap.exists) {
                              const umtReserverData = umtReserverSnap.data() as Trip;
-                             if (!properMatchGeometric(editedTripData, umtReserverData)) {
+                             const distances = getStoredDistances(editedTripData, umtData.reserving_trip_ref);
+                             if (!distances || !properMatchGeometric(editedTripData, umtReserverData, distances?.pickupDistance, distances?.destinationDistance)) {
                                  // n36: Set reserving_trip_obstruction on ET's potential entry
                                  isReservingTripObstruction = true;
                              }
@@ -488,6 +676,8 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                          // n35 if reserver not found
                     }
                     // n35 if not reserved
+
+                    const originalMutual = umtElement.mutual; // Mutual status before this edit cycle
 
                     // Add UMT to ET's potential (n35/n36)
                     const potentialEntryForET: PotentialTrip = {
@@ -507,97 +697,103 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                         group_largest_destination_overlap_gap: null,
                         unknown_trip_obstruction: false,
                         total_seat_count: null,
-                        // seat_count: umtData.seat_count // Add if needed
+                        seat_count: umtData.seat_count // Add if needed
                     };
-                     editedTripUpdate.potential_trips = FieldValue.arrayUnion(potentialEntryForET);
+                     customArrayUnion(editedTripUpdate.potential_trips, potentialEntryForET); // Use custom function to avoid duplicates
+                     editedTripUpdate.matched_trips.splice(umtIndexInETMatched, 1); // Remove from matched_trips
                      currentPotentialRefs.add(umtRef.path); // Track addition
                      logger.info(`Moved UMT ${umtRef.id} from matched to potential for ET ${editedTripRef.id} (match broken).`);
 
 
-                    // Update UMT: Remove ET from matched, Add ET to potential (n39)
+                    // --- Update UMT based on original mutual status ---
                     const umtUpdate: Record<string, any> = {};
-                    const etPotentialEntryForUMT: PotentialTrip = {
-                        trip_ref: editedTripRef,
-                        paid: false,
-                        trip_group_ref: null,
-                        pickup_radius: editedTripData.pickup_radius,
-                        destination_radius: editedTripData.destination_radius,
-                        pickup_distance: umtElement.pickup_distance,
-                        destination_distance: umtElement.destination_distance,
-                        proper_match: false,
-                        trip_obstruction: false,
-                        seat_obstruction: false,
-                        reserving_trip_obstruction: false, // UMT not obstructed by ET here
-                        mutual: true, // Corresponds to ET's entry
-                        group_largest_pickup_overlap_gap: null,
-                        group_largest_destination_overlap_gap: null,
-                        unknown_trip_obstruction: false,
-                        total_seat_count: null,
-                         // seat_count: editedTripData.seat_count // Add if needed
-                    };
-                    umtUpdate.potential_trips = FieldValue.arrayUnion(etPotentialEntryForUMT);
 
-                    // Remove ET from UMT's matched
-                    umtUpdate.matched_trips = FieldValue.arrayRemove({
-                        // Must match EXACTLY
-                        trip_ref: editedTripRef,
-                        paid: false,
-                        trip_group_ref: null,
-                        pickup_radius: editedTripBeforeData.pickup_radius, // Use BEFORE data
-                        destination_radius: editedTripBeforeData.destination_radius, // Use BEFORE data
-                        pickup_distance: umtElement.pickup_distance,
-                        destination_distance: umtElement.destination_distance,
-                        mutual: umtElement.mutual, // Use original mutual
-                        reserving: false // Assuming ET wasn't reserving UMT
-                    });
-                    transaction.update(umtRef, umtUpdate);
-                    logger.info(`Moved ET ${editedTripRef.id} from matched to potential for UMT ${umtRef.id}.`);
+                    if (originalMutual) {
+                        const umtMatched = [...(umtData.matched_trips || [])];
+                        const etIndexInUMTMatched = findTripIndex(umtMatched, editedTripRef);
+                        const potentialElementToRemove = umtMatched[etIndexInUMTMatched]; // Get the exact element to remove
+                        // UMT should have ET in its matched_trips. Update it there.
+                        const potentialEntryForUMT: PotentialTrip = {
+                            trip_ref: editedTripRef,
+                            paid: false,
+                            trip_group_ref: null,
+                            pickup_radius: editedTripData.pickup_radius,
+                            destination_radius: editedTripData.destination_radius,
+                            pickup_distance: potentialElementToRemove.pickup_distance,
+                            destination_distance: potentialElementToRemove.destination_distance,
+                            proper_match: false, // Matches geometrically
+                            trip_obstruction: false,
+                            seat_obstruction: false,
+                            reserving_trip_obstruction: false,
+                            mutual: true, // Set calculated mutual status
+                            group_largest_pickup_overlap_gap: null,
+                            group_largest_destination_overlap_gap: null,
+                            unknown_trip_obstruction: false,
+                            total_seat_count: null,
+                            seat_count: editedTripData.seat_count // Add if needed
+                        };
+                        // Use arrayUnion to add, avoids duplicates if somehow already there
+                        umtUpdate.potential_trips = FieldValue.arrayUnion(potentialEntryForUMT) as any;
+                        umtUpdate.matched_trips = FieldValue.arrayRemove(potentialElementToRemove) as any; // Remove from matched_trips
+                        logger.info(`Moved ET ${editedTripData.trip_id} to potential for ET ${umtRef.id} due to proper match conflict).`);
 
+                        // n42: Was ET the only match for UMT?
+                        const umtMatchedBefore = (umtData.matched_trips || []).filter(t => t.trip_ref.path !== editedTripRef.path);
+                        if (umtMatchedBefore.length === 0) {
+                            // n43: Update UMT status to unmatched
+                            transaction.update(umtRef, { status: "unmatched" });
+                            logger.info(`Set UMT ${umtRef.id} status to unmatched.`);
+                        }
 
-                    // n42: Was ET the only match for UMT?
-                    const umtMatchedBefore = (umtData.matched_trips || []).filter(t => t.trip_ref.path !== editedTripRef.path);
-                    if (umtMatchedBefore.length === 0) {
-                         // n43: Update UMT status to unmatched
-                         transaction.update(umtRef, { status: "unmatched" });
-                         logger.info(`Set UMT ${umtRef.id} status to unmatched.`);
+                    } else {
+                        // Original mutual was false. UMT should have ET in its potential_trips.
+                        logger.info(`Updating ET's entry in UMT ${umtRef.id}'s potential_trips (original mutual was false).`);
+                        const umtPotential = [...(umtData.potential_trips || [])];
+                        const etIndexInUMTPotential = findTripIndex(umtPotential, editedTripRef);
+
+                        if (etIndexInUMTPotential !== -1) {
+                            // ET IS reserved. Update ET in UMT's potential, set mutual=true.
+                            logger.info(`-- ET ${editedTripRef.id} is reserved. Updating radii and setting mutual=true in UMT's potential_trips.`);
+                            updateNestedTripField(umtUpdate, "potential_trips", etIndexInUMTPotential, "pickup_radius", editedTripData.pickup_radius);
+                            updateNestedTripField(umtUpdate, "potential_trips", etIndexInUMTPotential, "destination_radius", editedTripData.destination_radius);
+                            updateNestedTripField(umtUpdate, "potential_trips", etIndexInUMTPotential, "proper_match", false); // Match broken
+                            updateNestedTripField(umtUpdate, "potential_trips", etIndexInUMTPotential, "mutual", true); // ET now also sees UMT as potential
+                            updateNestedTripField(umtUpdate, "potential_trips", etIndexInUMTPotential, "reserving_trip_obstruction", currentlyReservedByEdit ? true : false); // No longer obstructed by ET's reservation
+                        } else {
+                            logger.warn(`-- ET ${editedTripRef.id} not found in UMT ${umtRef.id}'s potential_trips for update, despite original mutual=false.`);
+                            // Potential inconsistency.
+                        }
+                    }
+
+                    // Apply updates to UMT if any changes were prepared
+                    if (Object.keys(umtUpdate).length > 0) {
+                        transaction.update(umtRef, umtUpdate);
+                    } else {
+                         logger.info(`-- No updates needed for UMT ${umtRef.id} based on ET ${editedTripRef.id}'s state.`);
                     }
                 }
                 // n60: Loop continues implicitly
             }
-             // Update the edited trip's matched_trips array after processing unpaid ones
-            editedTripUpdate.matched_trips = nextMatchedForUnpaidCheck;
-
-
             // --- Process Unpaid Potential Trips (n61 - n106) ---
             logger.info(`Processing unpaid potential trips for ${editedTripRef.id}`);
-            // Combine potential trips from before data and any added during reservation checks
-            const potentialTripsBefore = editedTripBeforeData.potential_trips || [];
-            const potentialTripsAdded = (editedTripUpdate.potential_trips || [])
-                 .filter(pt => pt && !(pt instanceof FieldValue)); // Filter out FieldValue unions
-
-            const allPotentialTripElements = [...potentialTripsBefore];
-            for(const addedPt of potentialTripsAdded) {
-                 if (!findTripIndex(allPotentialTripElements, addedPt.trip_ref)) {
-                      allPotentialTripElements.push(addedPt);
-                 }
-            }
+            const potentialTripsToEvaluate = editedTripAfterData.potential_trips || [];
 
             const currentMatchedRefs = new Set((editedTripUpdate.matched_trips || []).map(mt => mt.trip_ref.path));
             const nextPotentialForUnpaidCheck: PotentialTrip[] = []; // Build the next state
 
-            for (const uptElement of allPotentialTripElements) {
+            for (const uptElement of potentialTripsToEvaluate) {
+                if (!editedTripUpdate.potential_trips) {
+                    editedTripUpdate.potential_trips = [];
+                }
+                if (!editedTripUpdate.matched_trips) {
+                    editedTripUpdate.matched_trips = [];
+                }
                  if (uptElement.paid) {
                       nextPotentialForUnpaidCheck.push(uptElement); // Keep paid potentials for now
                       continue; // Only process unpaid here
                  }
                  if (currentMatchedRefs.has(uptElement.trip_ref.path)) {
                      continue; // Skip if it got moved to matched already
-                 }
-                 // Check again if it was added during this transaction run already
-                  if (!currentPotentialRefs.has(uptElement.trip_ref.path)) {
-                     // This ensures we don't process stale elements that were replaced by arrayUnion
-                     logger.debug(`Skipping stale potential element processing for ${uptElement.trip_ref.id}`);
-                     continue;
                  }
 
                 const uptRef = uptElement.trip_ref;
@@ -614,202 +810,367 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
 
                 // n63: Does edited trip proper match UPT (based on updated values)?
                 const matchesUPT = properMatchGeometric(editedTripData, uptData, uptElement.pickup_distance, uptElement.destination_distance);
+                const uptIndexInETPotential = findTripIndex(potentialTripsToEvaluate, uptRef); // Get the index of UPT in ET's potential_trips
+                
+                if (matchesUPT) {
+                    logger.info(`ET ${editedTripRef.id} still matches unpaid trip ${uptRef.id}.`);
+                    // n44 -> Path: Check UMT reservation status
+                    let isObstructedByUPTReservation = false;
+                    // n45: Is UMT reserved?
+                    if (uptData.reserved && uptData.reserving_trip_ref) {
+                        // n47: Does ET proper match UMT's reserving trip?
+                        if (uptData.trip_id === newlyReservedTripId) {
+                            isObstructedByUPTReservation = true;
+                            return; // Skip further checks, already handled in reservation logic
+                        }
+                        const umtReserverSnap = await transaction.get(uptData.reserving_trip_ref);
+                        if (umtReserverSnap.exists) {
+                            const uptReserverData = umtReserverSnap.data() as Trip;
+                            const distances = getStoredDistances(editedTripData, uptData.reserving_trip_ref);
+                            if (!distances || !properMatchGeometric(editedTripData, uptReserverData, distances?.pickupDistance, distances?.destinationDistance)) {
+                                logger.info(`ET ${editedTripRef.id} does NOT match UMT ${uptRef.id}'s reserver ${uptData.reserving_trip_ref.id}.`);
+                                // n46: Conflict. Move UMT to ET's potential.
+                                isObstructedByUPTReservation = true;
+                            } else {
+                                // n48: ET matches UMT's reserver. OK to proceed.
+                                logger.info(`ET ${editedTripRef.id} matches UMT ${uptRef.id}'s reserver ${uptData.reserving_trip_ref.id}.`);
+                                matched = true; // Remains matched
+                            }
+                        } else {
+                             logger.warn(`UMT ${uptRef.id}'s reserving trip ${uptData.reserving_trip_ref.id} not found. Treating as not obstructed.`);
+                             matched = true; // Remains matched
+                        }
+                    } else {
+                        // n45 -> No -> n48: UMT not reserved. OK to proceed.
+                        logger.info(`UMT ${uptRef.id} is not reserved.`);
+                        matched = true; // Remains matched
+                    }
 
-                 if (matchesUPT) {
-                     logger.info(`ET ${editedTripRef.id} now matches unpaid potential trip ${uptRef.id}.`);
-                     // n66/n65: Check UPT reservation status
-                     let canBecomeMatch = true;
-                     let reservationObstructsPotential = false; // Does UPT's reservation prevent ET match?
-                     let etReservationObstructsPotential = false; // Does ET's reservation prevent UPT match?
+                    if (isObstructedByUPTReservation) {
+                        // ET matches UMT geometrically, but UMT's reservation causes conflict.
 
-                     // n65: Is UPT reserved?
-                     if (uptData.reserved && uptData.reserving_trip_ref) {
-                         // n64: Does ET proper match UPT's reserving trip?
+                        // --- Update ET: Move UMT to potential_trips ---
+                        const originalMutual = uptElement.mutual; // Mutual status before this edit cycle
+
+                        // Determine the new mutual status for the potential entry on ET's side
+                        let newMutualForETPotential: boolean;
+                        if (!originalMutual && currentlyReservedByEdit) {
+                            // Case: Originally NOT mutual AND ET IS currently reserved
+                            newMutualForETPotential = true;
+                        } else {
+                            // Case: Originally mutual OR (Originally NOT mutual AND ET is NOT currently reserved)
+                            newMutualForETPotential = false;
+                        }
+
+                        editedTripUpdate.potential_trips[uptIndexInETPotential].reserving_trip_obstruction = true; // Set trip_obstruction to true
+                        currentPotentialRefs.add(uptRef.path); // Track addition
+                        logger.info(`Moved UMT ${uptRef.id} to potential for ET ${editedTripRef.id} due to reservation conflict (mutual set to ${newMutualForETPotential}).`);
+
+
+                        // --- Update UMT based on original mutual status ---
+                        const umtUpdate: Record<string, any> = {};
+
+                        if (!originalMutual) {
+                            // UPT should have ET in its matched_trips. Update it there.
+                            logger.info(`Updating ET's entry in UMT ${uptRef.id}'s matched_trips (original mutual was true).`);
+                            const uptMatched = [...(uptData.matched_trips || [])];
+                            const etIndexInUPTMatched = findTripIndex(uptMatched, editedTripRef);
+
+                            if (etIndexInUPTMatched !== -1) {
+                                // Update radii and set mutual to false
+                                updateNestedTripField(umtUpdate, "matched_trips", etIndexInUPTMatched, "pickup_radius", editedTripData.pickup_radius);
+                                updateNestedTripField(umtUpdate, "matched_trips", etIndexInUPTMatched, "destination_radius", editedTripData.destination_radius);
+                                // updateNestedTripField(umtUpdate, "matched_trips", etIndexInUPTMatched, "mutual", false); // ET no longer sees UPT as matched
+                                logger.info(`-- Updated radii and set mutual=false for ET ${editedTripRef.id} in UMT ${uptRef.id}'s matched_trips.`);
+                            } else {
+                                logger.warn(`-- ET ${editedTripRef.id} not found in UMT ${uptRef.id}'s matched_trips for update, despite original mutual=true.`);
+                                // Potential inconsistency, log it. Maybe it was already removed?
+                            }
+                        } else {
+                            // Original mutual was true. UPT should have ET in its potential_trips.
+                            logger.info(`Updating ET's entry in UPT ${uptRef.id}'s potential_trips (original mutual was true).`);
+                            const uptPotential = [...(uptData.potential_trips || [])];
+                            const etIndexInUPTPotential = findTripIndex(uptPotential, editedTripRef);
+
+                            if (etIndexInUPTPotential !== -1) {
+                                if (currentlyReservedByEdit && uptElement.reserving_trip_obstruction) {
+                                    // ET IS reserved. Update ET in UPT's potential, set mutual=true.
+                                    logger.info(`-- ET ${editedTripRef.id} is reserved. Updating radii and setting mutual=true in UPT's potential_trips.`);
+                                    updateNestedTripField(umtUpdate, "potential_trips", etIndexInUPTPotential, "pickup_radius", editedTripData.pickup_radius);
+                                    updateNestedTripField(umtUpdate, "potential_trips", etIndexInUPTPotential, "destination_radius", editedTripData.destination_radius);
+                                    // updateNestedTripField(umtUpdate, "potential_trips", etIndexInUPTPotential, "mutual", true); // ET now also sees UPT as potential
+                                } else {
+                                    // ET is NOT reserved. Move ET from UPT's potential to matched, mutual=false.
+                                    logger.info(`-- ET ${editedTripRef.id} is not reserved. Moving from potential to matched in UPT.`);
+                                    const potentialElementToRemove = uptPotential[etIndexInUPTPotential]; // Get the exact element to remove
+
+                                    const newMatchedEntryForUPT: MatchedTrip = {
+                                        trip_ref: editedTripRef,
+                                        paid: false,
+                                        trip_group_ref: null,
+                                        pickup_radius: editedTripData.pickup_radius, // Updated radii
+                                        destination_radius: editedTripData.destination_radius, // Updated radii
+                                        pickup_distance: potentialElementToRemove.pickup_distance, // Keep original distance
+                                        destination_distance: potentialElementToRemove.destination_distance, // Keep original distance
+                                        mutual: false, // As requested
+                                        reserving: false,
+                                        seat_count: editedTripData.seat_count // Add if needed
+                                    };
+                                    // Use atomic array operations
+                                    umtUpdate.potential_trips = FieldValue.arrayRemove(potentialElementToRemove);
+                                    umtUpdate.matched_trips = FieldValue.arrayUnion(newMatchedEntryForUPT);
+                                    const uptMatchedBefore = uptData.matched_trips;
+                                    if (uptMatchedBefore.length === 0) {
+                                        // n43: Update UPT status to matched
+                                        transaction.update(uptRef, { status: "matched" });
+                                        logger.info(`Set UPT ${uptRef.id} status to matched.`);
+                                    }
+                                }
+                            } else {
+                                logger.warn(`-- ET ${editedTripRef.id} not found in UMT ${uptRef.id}'s potential_trips for update, despite original mutual=false.`);
+                                // Potential inconsistency.
+                            }
+                        }
+
+                        // Apply updates to UMT if any changes were prepared
+                        if (Object.keys(umtUpdate).length > 0) {
+                            transaction.update(uptRef, umtUpdate);
+                        } else {
+                             logger.info(`-- No updates needed for UMT ${uptRef.id} based on ET ${editedTripRef.id}'s state.`);
+                        }
+
+                    } else { // This 'else' corresponds to 'if (isObstructedByUMTReservation)'
+                         // ET matches UPT and is NOT obstructed by UPT's reservation.
+                         // Original logic for this path (n48 ->) should remain here.
+                         // Update radii on UPT's matched entry, handle mutual sync based on ET reservation.
+
+                         logger.info(`ET ${editedTripRef.id} still matches UPT ${uptRef.id} and is not obstructed by reservation.`);
+                         matched = true; // Remains matched from ET's perspective
+
+                         // Update radii and potentially mutual on UMT's matched entry for ET
+                         const uptUpdate: Record<string, any> = {};
+                         const originalMutual = uptElement.mutual;
+
+                         if (!originalMutual) {
+                            // UMT should have ET in its matched_trips. Update it there.
+                            logger.info(`Updating ET's entry in UMT ${uptRef.id}'s matched_trips (original mutual was true).`);
+                            const uptMatched = [...(uptData.matched_trips || [])];
+                            const etIndexInUMTMatched = findTripIndex(uptMatched, editedTripRef);
+                            
+                            if (etIndexInUMTMatched !== -1) {
+                                // Update radii and set mutual to false
+                                updateNestedTripField(uptUpdate, "matched_trips", etIndexInUMTMatched, "pickup_radius", editedTripData.pickup_radius);
+                                updateNestedTripField(uptUpdate, "matched_trips", etIndexInUMTMatched, "destination_radius", editedTripData.destination_radius);
+                                logger.info(`-- Updated radii for ET ${editedTripRef.id} in UMT ${uptRef.id}'s matched_trips.`);
+
+                                const newMatchedEntryForET: MatchedTrip = {
+                                    trip_ref: uptRef,
+                                    paid: false,
+                                    trip_group_ref: null,
+                                    pickup_radius: uptData.pickup_radius, // Updated radii
+                                    destination_radius: uptData.destination_radius, // Updated radii
+                                    pickup_distance: uptElement.pickup_distance, // Keep original distance
+                                    destination_distance: uptElement.destination_distance, // Keep original distance
+                                    mutual: true, // As requested
+                                    reserving: false,
+                                    seat_count: uptData.seat_count // Add if needed
+                                }
+
+                                customArrayUnion(editedTripUpdate.matched_trips, newMatchedEntryForET); // Use custom function to avoid duplicates
+                                editedTripUpdate.potential_trips?.splice(uptIndexInETPotential, 1); // Remove from potential_trips
+                            } else {
+                                logger.warn(`-- ET ${editedTripRef.id} not found in UMT ${uptRef.id}'s matched_trips for update, despite original mutual=true.`);
+                                // Potential inconsistency, log it. Maybe it was already removed?
+                            }
+                        } else {
+                            // Original mutual was true. UPT should have ET in its potential_trips.
+                            logger.info(`Updating ET's entry in UPT ${uptRef.id}'s potential_trips (original mutual was true).`);
+                            const uptPotential = [...(uptData.potential_trips || [])];
+                            const etIndexInUPTPotential = findTripIndex(uptPotential, editedTripRef);
+
+                            if (etIndexInUPTPotential !== -1) {
+                                if (currentlyReservedByEdit && uptElement.reserving_trip_obstruction) {
+                                    // ET IS reserved. Update ET in UMT's potential, set mutual=true.
+                                    logger.info(`-- ET ${editedTripRef.id} is reserved. Updating radii in UPT's potential_trips.`);
+                                    updateNestedTripField(uptUpdate, "potential_trips", etIndexInUPTPotential, "pickup_radius", editedTripData.pickup_radius);
+                                    updateNestedTripField(uptUpdate, "potential_trips", etIndexInUPTPotential, "destination_radius", editedTripData.destination_radius);
+                                    updateNestedTripField(uptUpdate, "potential_trips", etIndexInUPTPotential, "mutual", false); // ET sees UMT as matched
+
+                                    const newMatchedEntryForET: MatchedTrip = {
+                                        trip_ref: uptRef,
+                                        paid: false,
+                                        trip_group_ref: null,
+                                        pickup_radius: uptData.pickup_radius, // Updated radii
+                                        destination_radius: uptData.destination_radius, // Updated radii
+                                        pickup_distance: uptElement.pickup_distance, // Keep original distance
+                                        destination_distance: uptElement.destination_distance, // Keep original distance
+                                        mutual: false, // As requested
+                                        reserving: false,
+                                        seat_count: uptData.seat_count // Add if needed
+                                    }
+
+                                    customArrayUnion(editedTripUpdate.matched_trips, newMatchedEntryForET); // Use custom function to avoid duplicates
+                                    editedTripUpdate.potential_trips?.splice(uptIndexInETPotential, 1); // Remove from potential_trips
+                                } else {
+                                    // ET is NOT reserved. Move ET from UPT's potential to matched, mutual=true.
+                                    logger.info(`-- ET ${editedTripRef.id} is not reserved. Moving from potential to matched in UPT.`);
+                                    const potentialElementToRemove = uptPotential[etIndexInUPTPotential]; // Get the exact element to remove
+
+                                    const newMatchedEntryForUPT: MatchedTrip = {
+                                        trip_ref: editedTripRef,
+                                        paid: false,
+                                        trip_group_ref: null,
+                                        pickup_radius: editedTripData.pickup_radius, // Updated radii
+                                        destination_radius: editedTripData.destination_radius, // Updated radii
+                                        pickup_distance: potentialElementToRemove.pickup_distance, // Keep original distance
+                                        destination_distance: potentialElementToRemove.destination_distance, // Keep original distance
+                                        mutual: true, // As requested
+                                        reserving: false,
+                                        seat_count: editedTripData.seat_count // Add if needed
+                                    };
+                                    // Use atomic array operations
+                                    uptUpdate.potential_trips = FieldValue.arrayRemove(potentialElementToRemove);
+                                    uptUpdate.matched_trips = FieldValue.arrayUnion(newMatchedEntryForUPT);
+                                    const uptMatchedBefore = uptData.matched_trips
+                                    if (uptMatchedBefore.length === 0) {
+                                        // n43: Update UMT status to unmatched
+                                        transaction.update(uptRef, { status: "matched" });
+                                        logger.info(`Set UPT ${uptRef.id} status to matched.`);
+                                    }
+
+                                    const newMatchedEntryForET: MatchedTrip = {
+                                        trip_ref: uptRef,
+                                        paid: false,
+                                        trip_group_ref: null,
+                                        pickup_radius: uptData.pickup_radius, // Updated radii
+                                        destination_radius: uptData.destination_radius, // Updated radii
+                                        pickup_distance: uptElement.pickup_distance, // Keep original distance
+                                        destination_distance: uptElement.destination_distance, // Keep original distance
+                                        mutual: true, // As requested
+                                        reserving: false,
+                                        seat_count: uptData.seat_count // Add if needed
+                                    }
+
+                                    customArrayUnion(editedTripUpdate.matched_trips, newMatchedEntryForET); // Use custom function to avoid duplicates
+                                    editedTripUpdate.potential_trips?.splice(uptIndexInETPotential, 1); // Remove from potential_trips
+                                }
+                            } else {
+                                logger.warn(`-- ET ${editedTripRef.id} not found in UMT ${uptRef.id}'s potential_trips for update, despite original mutual=false.`);
+                                // Potential inconsistency.
+                            }
+                        }
+
+                        // Apply updates to UMT if any changes were prepared
+                        if (Object.keys(uptUpdate).length > 0) {
+                            transaction.update(uptRef, uptUpdate);
+                        } else {
+                             logger.info(`-- No updates needed for UMT ${uptRef.id} based on ET ${editedTripRef.id}'s state.`);
+                        }
+                    }
+
+                } else {
+                    logger.info(`ET ${editedTripRef.id} DOES NOT match unpaid trip ${uptRef.id}. Staying in potential.`);
+                    // n32 -> Path: Move to potential on both sides
+                    let isReservingTripObstruction = false;
+                    // n33: Is UPT reserved?
+                    if (uptData.reserved && uptData.reserving_trip_ref) {
+                        // n34: Does ET proper match UPT's reserving trip?
+                        if (uptData.trip_id === newlyReservedTripId) {
+                            isReservingTripObstruction = true;
+                            return; // Skip further checks, already handled in reservation logic
+                        }
                          const uptReserverSnap = await transaction.get(uptData.reserving_trip_ref);
                          if (uptReserverSnap.exists) {
                              const uptReserverData = uptReserverSnap.data() as Trip;
-                             if (!properMatchGeometric(editedTripData, uptReserverData)) {
-                                 // n89 -> Path: Cannot become match due to UPT reservation
-                                 canBecomeMatch = false;
-                                 reservationObstructsPotential = true; // UPT's reservation obstructs ET
-                                 logger.info(`ET ${editedTripRef.id} cannot match UPT ${uptRef.id} due to conflict with UPT's reserver ${uptData.reserving_trip_ref.id}.`);
+                             const distances = getStoredDistances(editedTripData, uptData.reserving_trip_ref);
+                             if (!distances || !properMatchGeometric(editedTripData, uptReserverData, distances?.pickupDistance, distances?.destinationDistance)) {
+                                 // n36: Set reserving_trip_obstruction on ET's potential entry
+                                 isReservingTripObstruction = true;
                              }
-                             // n67 if match
+                             // n35 if match is true
                          }
-                         // n67 if reserver not found
-                     }
+                         // n35 if reserver not found
+                    }
+                    // n35 if not reserved
 
-                     // Also check if ET is reserved and obstructs UPT
-                     if (currentlyReservedByEdit && formerReservingTripRef) {
-                          const formerReserverSnap = await transaction.get(formerReservingTripRef); // Fetch again if needed, or reuse if available
-                           if(formerReserverSnap.exists) {
-                                const formerReservingTripData = formerReserverSnap.data() as Trip;
-                                if (!properMatchGeometric(uptData, formerReservingTripData)) {
-                                     // If UPT doesn't match ET's reserver, ET's reservation obstructs
-                                     etReservationObstructsPotential = true;
-                                     // This doesn't necessarily block the match from ET's side, but affects potential entry details
-                                     logger.info(`ET ${editedTripRef.id}'s reservation obstructs potential match with UPT ${uptRef.id}.`);
-                                }
-                           }
-                     }
+                    const originalMutual = uptElement.mutual; // Mutual status before this edit cycle
+
+                    // Add UMT to ET's potential (n35/n36)
+                     editedTripUpdate.potential_trips[uptIndexInETPotential].proper_match = false; // Set trip_obstruction to true   
+                     currentPotentialRefs.add(uptRef.path); // Track addition
+                     logger.info(`Updated UPT ${uptRef.id} in potential for ET ${editedTripRef.id} (match broken).`);
 
 
-                     if (canBecomeMatch) {
-                         // n67 -> Path: Potential becomes Match
-                         matched = true; // ET is now matched
-                         logger.info(`Promoting UPT ${uptRef.id} from potential to matched for ET ${editedTripRef.id}.`);
+                    // --- Update UMT based on original mutual status ---
+                    const uptUpdate: Record<string, any> = {};
 
-                         // Add UPT to ET's matched_trips
-                         const newMatchedEntryForET: MatchedTrip = {
-                             trip_ref: uptRef,
-                             paid: false,
-                             trip_group_ref: null,
-                             pickup_radius: uptData.pickup_radius,
-                             destination_radius: uptData.destination_radius,
-                             pickup_distance: uptElement.pickup_distance,
-                             destination_distance: uptElement.destination_distance,
-                             mutual: uptElement.mutual, // Preserve mutual from potential entry
-                             reserving: false, // ET is not reserving UPT here
-                             // seat_count: uptData.seat_count // Add if needed
-                         };
-                         // Add to the array being built for the update
-                         (editedTripUpdate.matched_trips as MatchedTrip[]).push(newMatchedEntryForET);
-                         currentMatchedRefs.add(uptRef.path); // Track addition
-                         currentPotentialRefs.delete(uptRef.path); // Remove from potential tracking
+                    if (!originalMutual) {
+                        const uptMatched = [...(uptData.matched_trips || [])];
+                        const etIndexInUPTMatched = findTripIndex(uptMatched, editedTripRef);
+                        const potentialElementToRemove = uptMatched[etIndexInUPTMatched]; // Get the exact element to remove
+                        // UMT should have ET in its matched_trips. Update it there.
+                        const potentialEntryForUPT: PotentialTrip = {
+                            trip_ref: editedTripRef,
+                            paid: false,
+                            trip_group_ref: null,
+                            pickup_radius: editedTripData.pickup_radius,
+                            destination_radius: editedTripData.destination_radius,
+                            pickup_distance: potentialElementToRemove.pickup_distance,
+                            destination_distance: potentialElementToRemove.destination_distance,
+                            proper_match: false, // Matches geometrically
+                            trip_obstruction: false,
+                            seat_obstruction: false,
+                            reserving_trip_obstruction: false,
+                            mutual: true, // Set calculated mutual status
+                            group_largest_pickup_overlap_gap: null,
+                            group_largest_destination_overlap_gap: null,
+                            unknown_trip_obstruction: false,
+                            total_seat_count: null,
+                            seat_count: editedTripData.seat_count // Add if needed
+                        };
+                        // Use arrayUnion to add, avoids duplicates if somehow already there
+                        uptUpdate.potential_trips = FieldValue.arrayUnion(potentialEntryForUPT) as any;
+                        uptUpdate.matched_trips = FieldValue.arrayRemove(potentialElementToRemove) as any; // Remove from matched_trips
+                        logger.info(`Moved ET ${editedTripData.trip_id} to potential for UPT ${uptRef.id} due to proper match conflict).`);
 
-                         // Update UPT: Remove ET from potential, Add ET to matched
-                         const uptUpdate: Record<string, any> = {};
-                         const newMatchedEntryForUPT: MatchedTrip = {
-                             trip_ref: editedTripRef,
-                             paid: false,
-                             trip_group_ref: null,
-                             pickup_radius: editedTripData.pickup_radius,
-                             destination_radius: editedTripData.destination_radius,
-                             pickup_distance: uptElement.pickup_distance,
-                             destination_distance: uptElement.destination_distance,
-                             mutual: uptElement.mutual, // Match mutual status
-                             reserving: false,
-                             // seat_count: editedTripData.seat_count // Add if needed
-                         };
-                          // Use arrayUnion for matched, arrayRemove for potential
-                         uptUpdate.matched_trips = FieldValue.arrayUnion(newMatchedEntryForUPT);
-                         uptUpdate.potential_trips = FieldValue.arrayRemove(uptElement); // Remove the exact potential element
-                         transaction.update(uptRef, uptUpdate);
-                         logger.info(`Moved ET ${editedTripRef.id} from potential to matched for UPT ${uptRef.id}.`);
+                        // n42: Was ET the only match for UMT?
+                        const uptMatchedBefore = (uptData.matched_trips || []).filter(t => t.trip_ref.path !== editedTripRef.path);
+                        if (uptMatchedBefore.length === 0) {
+                            // n43: Update UMT status to unmatched
+                            transaction.update(uptRef, { status: "unmatched" });
+                            logger.info(`Set UMT ${uptRef.id} status to unmatched.`);
+                        }
 
-                         // n96: If UPT status was unmatched, update it
-                         if (uptData.status === "unmatched") {
-                             transaction.update(uptRef, { status: "matched" });
-                             logger.info(`Set UPT ${uptRef.id} status to matched.`);
-                         }
+                    } else {
+                        // Original mutual was true. UPT should have ET in its potential_trips.
+                        logger.info(`Updating ET's entry in UPT ${uptRef.id}'s potential_trips (original mutual was false).`);
+                        const uptPotential = [...(uptData.potential_trips || [])];
+                        const etIndexInUPTPotential = findTripIndex(uptPotential, editedTripRef);
 
-                     } else {
-                         // n89 -> Path: Cannot become match, update potential entry details
-                         logger.info(`Updating potential entry for UPT ${uptRef.id} on ET ${editedTripRef.id} (match obstructed).`);
-                         uptElement.proper_match = true; // Still matches geometrically
-                         uptElement.reserving_trip_obstruction = reservationObstructsPotential || etReservationObstructsPotential; // Obstructed either way
-                         // Update radii based on ET changes
-                         uptElement.pickup_distance = distanceBetween(editedTripData.pickup_latlng, uptData.pickup_latlng); // Recalculate if needed
-                         uptElement.destination_distance = distanceBetween(editedTripData.destination_latlng, uptData.destination_latlng); // Recalculate if needed
-                         // Keep uptElement in the potential list being built
-                         nextPotentialForUnpaidCheck.push(uptElement);
+                        if (etIndexInUPTPotential !== -1) {
+                            // ET IS reserved. Update ET in UMT's potential, set mutual=true.
+                            logger.info(`-- ET ${editedTripRef.id} is reserved. Updating radii and setting mutual=true in UMT's potential_trips.`);
+                            updateNestedTripField(uptUpdate, "potential_trips", etIndexInUPTPotential, "pickup_radius", editedTripData.pickup_radius);
+                            updateNestedTripField(uptUpdate, "potential_trips", etIndexInUPTPotential, "destination_radius", editedTripData.destination_radius);
+                            updateNestedTripField(uptUpdate, "potential_trips", etIndexInUPTPotential, "proper_match", false); // Match broken
+                            updateNestedTripField(uptUpdate, "potential_trips", etIndexInUPTPotential, "reserving_trip_obstruction", currentlyReservedByEdit ? true : false); // No longer obstructed by ET's reservation
+                        } else {
+                            logger.warn(`-- ET ${editedTripRef.id} not found in UMT ${uptRef.id}'s potential_trips for update, despite original mutual=false.`);
+                            // Potential inconsistency.
+                        }
+                    }
 
-                         // Update UPT's potential entry for ET too
-                         const uptUpdate: Record<string, any> = {};
-                         const uptPotential = [...(uptData.potential_trips || [])];
-                         const etIndexInUPTPotential = findTripIndex(uptPotential, editedTripRef);
-                         if (etIndexInUPTPotential !== -1) {
-                             uptPotential[etIndexInUPTPotential].proper_match = true;
-                             uptPotential[etIndexInUPTPotential].reserving_trip_obstruction = reservationObstructsPotential || etReservationObstructsPotential;
-                             uptPotential[etIndexInUPTPotential].pickup_radius = editedTripData.pickup_radius;
-                             uptPotential[etIndexInUPTPotential].destination_radius = editedTripData.destination_radius;
-                             uptPotential[etIndexInUPTPotential].pickup_distance = uptElement.pickup_distance; // Use consistent distance
-                             uptPotential[etIndexInUPTPotential].destination_distance = uptElement.destination_distance; // Use consistent distance
-                             uptUpdate.potential_trips = uptPotential;
-                             transaction.update(uptRef, uptUpdate);
-                             logger.info(`Updated potential entry for ET ${editedTripRef.id} on UPT ${uptRef.id}.`);
-                         } else {
-                              logger.warn(`ET ${editedTripRef.id} not found in UPT ${uptRef.id}'s potential trips for update.`);
-                         }
-                     }
-
-                 } else {
-                     // n74 -> Path: Still doesn't match, update potential entry
-                     logger.info(`ET ${editedTripRef.id} still does not match unpaid potential trip ${uptRef.id}. Updating potential entry.`);
-                     uptElement.proper_match = false;
-                     // Update distances and radii if necessary
-                     uptElement.pickup_distance = distanceBetween(editedTripData.pickup_latlng, uptData.pickup_latlng); // Recalculate
-                     uptElement.destination_distance = distanceBetween(editedTripData.destination_latlng, uptData.destination_latlng); // Recalculate
-                     uptElement.pickup_radius = uptData.pickup_radius; // UPT radius doesn't change here
-                     uptElement.destination_radius = uptData.destination_radius; // UPT radius doesn't change here
-
-                     // Check reservation obstruction (n82-n87)
-                     let isReservingTripObstructed = false;
-                     if (uptData.reserved && uptData.reserving_trip_ref) {
-                          const uptReserverSnap = await transaction.get(uptData.reserving_trip_ref);
-                          if (uptReserverSnap.exists) {
-                              const uptReserverData = uptReserverSnap.data() as Trip;
-                              // n84: Does ET proper match UPT's reserving trip?
-                              if (!properMatchGeometric(editedTripData, uptReserverData)) {
-                                  // n86: Set obstruction
-                                  isReservingTripObstructed = true;
-                              }
-                          }
-                     }
-                     // Also check if ET's reservation obstructs UPT
-                      if (currentlyReservedByEdit && formerReservingTripRef) {
-                           const formerReserverSnap = await transaction.get(formerReservingTripRef);
-                            if(formerReserverSnap.exists) {
-                                const formerReservingTripData = formerReserverSnap.data() as Trip;
-                                if (!properMatchGeometric(uptData, formerReservingTripData)) {
-                                     isReservingTripObstructed = true; // Obstructed if either reservation conflicts
-                                }
-                            }
-                      }
-                     uptElement.reserving_trip_obstruction = isReservingTripObstructed;
-
-                     // Keep uptElement in the potential list being built
-                     nextPotentialForUnpaidCheck.push(uptElement);
-
-                     // Update UPT's potential entry for ET
-                     const uptUpdate: Record<string, any> = {};
-                     const uptPotential = [...(uptData.potential_trips || [])];
-                     const etIndexInUPTPotential = findTripIndex(uptPotential, editedTripRef);
-                     if (etIndexInUPTPotential !== -1) {
-                         uptPotential[etIndexInUPTPotential].proper_match = false;
-                         uptPotential[etIndexInUPTPotential].pickup_radius = editedTripData.pickup_radius;
-                         uptPotential[etIndexInUPTPotential].destination_radius = editedTripData.destination_radius;
-                         uptPotential[etIndexInUPTPotential].pickup_distance = uptElement.pickup_distance; // Use consistent distance
-                         uptPotential[etIndexInUPTPotential].destination_distance = uptElement.destination_distance; // Use consistent distance
-                         uptPotential[etIndexInUPTPotential].reserving_trip_obstruction = isReservingTripObstructed;
-                         uptUpdate.potential_trips = uptPotential;
-                         transaction.update(uptRef, uptUpdate);
-                         logger.info(`Updated potential entry for ET ${editedTripRef.id} on UPT ${uptRef.id} (still no match).`);
-
-                          // n80: If UPT had ET in matched before, remove it
-                          const etIndexInUMTMatched = findTripIndex(uptData.matched_trips || [], editedTripRef);
-                          if (etIndexInUMTMatched !== -1) {
-                              logger.info(`Detected UPT ${uptRef.id} had ET ${editedTripRef.id} as matched previously. Removing.`);
-                              // Must match EXACTLY - use before data
-                               const removalElement = (uptData.matched_trips || [])[etIndexInUMTMatched];
-                               if (removalElement) {
-                                   // Need to ensure radii match the *state before this edit*
-                                   // This is complex. Simplification: Assume arrayRemove works if ref matches.
-                                   transaction.update(uptRef, { matched_trips: FieldValue.arrayRemove(removalElement) });
-                                   logger.info(`Attempted removal of ET from UPT ${uptRef.id}'s matched trips.`);
-                               }
-                          }
-
-                     } else {
-                         logger.warn(`ET ${editedTripRef.id} not found in UPT ${uptRef.id}'s potential trips for update.`);
-                     }
-                 }
-                  // n106: Loop continues implicitly
+                    // Apply updates to UMT if any changes were prepared
+                    if (Object.keys(uptUpdate).length > 0) {
+                        transaction.update(uptRef, uptUpdate);
+                    } else {
+                         logger.info(`-- No updates needed for UMT ${uptRef.id} based on ET ${editedTripRef.id}'s state.`);
+                    }
+                }
+                // n60: Loop continues implicitly
             }
              // Update the edited trip's potential_trips array after processing unpaid ones
              // Combine with paid potentials processed later
-             editedTripUpdate.potential_trips = nextPotentialForUnpaidCheck; // Start building the final potential array
-
 
             // --- Process Paid Trips (Matched & Potential) (n107 - n220) ---
             logger.info(`Processing paid matched/potential trips for ${editedTripRef.id}`);
@@ -818,8 +1179,8 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
             const paidPotentialBefore = (editedTripBeforeData.potential_trips || []).filter(t => t.paid);
             const allPaidRefsMap = new Map<string, { element: MatchedTrip | PotentialTrip, type: 'matched' | 'potential' }>();
 
-             (editedTripUpdate.matched_trips || []).filter(t => t.paid).forEach(el => allPaidRefsMap.set(el.trip_ref.path, {element: el, type: 'matched'}));
-             (editedTripUpdate.potential_trips || []).filter(t => t.paid).forEach(el => {
+             (editedTripData.matched_trips || []).filter(t => t.paid).forEach(el => allPaidRefsMap.set(el.trip_ref.path, {element: el, type: 'matched'}));
+             (editedTripData.potential_trips || []).filter(t => t.paid).forEach(el => {
                   if (!allPaidRefsMap.has(el.trip_ref.path)) { // Don't overwrite if it was matched
                      allPaidRefsMap.set(el.trip_ref.path, {element: el, type: 'potential'});
                   }
@@ -874,26 +1235,35 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                             continue;
                         }
                         const memberData = memberSnap.data() as Trip;
-
+                        if (await checkMemberUnknownToTrip(editedTripData, memberData)) {
+                            logger.info(`Member ${member.trip_ref.id} is unknown to ET ${editedTripRef.id}.`);
+                            tgInfo.tripObstruction = true; // Set obstruction flag for the group
+                            continue; // Skip if unknown to ET
+                        }
                         // n117: Does ET proper match TG member?
-                        if (!properMatchGeometric(editedTripData, memberData)) {
+                        const distances = getStoredDistances(editedTripData, member.trip_ref);
+                        if (!distances) {
+                            logger.warn(`Distances not found for ET ${editedTripRef.id} and TG member ${member.trip_ref.id}.`);
+                            continue; // Skip if distances not found
+                        }
+                        if (!properMatchGeometric(editedTripData, memberData, distances?.pickupDistance, distances?.destinationDistance)) {
                             tgInfo.tripObstruction = true; // Set obstruction flag for the group
 
                             // Calculate gaps
-                            const pd = distanceBetween(editedTripData.pickup_latlng, memberData.pickup_latlng);
-                            const dd = distanceBetween(editedTripData.destination_latlng, memberData.destination_latlng);
+                            const pd = distances.pickupDistance;
+                            const dd = distances.destinationDistance;
                             const gapP = calculateGap(editedTripData, memberData, 'pickup', pd);
                             const gapD = calculateGap(editedTripData, memberData, 'destination', dd);
 
                             // Update largest gaps for the group
-                            tgInfo.largestPickupOverlapGap = Math.max(tgInfo.largestPickupOverlapGap, gapP);
-                            tgInfo.largestDestinationOverlapGap = Math.max(tgInfo.largestDestinationOverlapGap, gapD);
+                            tgInfo.largestPickupOverlapGap = Math.max(tgInfo.largestPickupOverlapGap, gapP ? gapP : 0);
+                            tgInfo.largestDestinationOverlapGap = Math.max(tgInfo.largestDestinationOverlapGap, gapD ? gapD : 0);
 
                             // Add/update obstructing member entry (n131-n133)
                              obstructingMembersUpdate.push({
                                  trip_ref: member.trip_ref,
-                                 pickup_overlap_gap: gapP > 0 ? gapP : 0, // Store 0 if no gap
-                                 destination_overlap_gap: gapD > 0 ? gapD : 0, // Store 0 if no gap
+                                 pickup_overlap_gap: gapP ? (gapP > 0 ? gapP : 0) : 0, // Store 0 if no gap
+                                 destination_overlap_gap: gapD ? (gapD > 0 ? gapD : 0) : 0, // Store 0 if no gap
                                  unknown: false,
                              });
                              logger.debug(`ET ${editedTripRef.id} obstructed by TG member ${member.trip_ref.id}. Gaps: P=${gapP}, D=${gapD}`);
@@ -903,7 +1273,7 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
 
                     // n122: Check Seat Obstruction
                     const availableSeats = 4 - (tgData.total_seat_count || 0); // Assume max 4 seats per group
-                    tgInfo.seatObstruction = availableSeats < (editedTripData.seat_count || 1);
+                    tgInfo.seatObstruction = availableSeats < editedTripData.seat_count;
 
                     tripGroupsInfoMap.set(tgPath, tgInfo); // Store calculated info
 
@@ -970,23 +1340,9 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
 
                  let isTripObstructed = tgInfo?.tripObstruction ?? !matchesGeometrically; // Obstructed if TG says so OR fails geometric match now
                  let isSeatObstructed = tgInfo?.seatObstruction ?? false; // Obstructed if TG says so
-                 let isReservingObstructed = tripElement.reserving_trip_obstruction; // Keep previous value unless recalculated
-
-                 // Check if ET's reservation obstructs this trip
-                 if (currentlyReservedByEdit && formerReservingTripRef) {
-                      const formerReserverSnap = await transaction.get(formerReservingTripRef);
-                      if(formerReserverSnap.exists) {
-                            const formerReservingTripData = formerReserverSnap.data() as Trip;
-                            if (!properMatchGeometric(tripData, formerReservingTripData)) {
-                                isReservingObstructed = true;
-                                logger.info(`ET's reservation obstructs paid trip ${tripRef.id}.`);
-                            } else {
-                                // If it DOES match the reserver, the obstruction *might* be cleared
-                                // Graph logic n193-n195 / n178-n179
-                                isReservingObstructed = false; // Clear obstruction if ET matches reserver
-                            }
-                      }
-                 }
+                 const otherPotential = [...(tripData.potential_trips || [])];
+                 const etIndexInOtherPotential = findTripIndex(otherPotential, editedTripRef);
+                 let isReservingObstructed = tripData.potential_trips[etIndexInOtherPotential].reserving_trip_obstruction && currentlyReservedByEdit; // Keep previous value unless recalculated
 
                  const canBeMatched = matchesGeometrically && !isTripObstructed && !isSeatObstructed && !isReservingObstructed;
 
@@ -1001,18 +1357,43 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                          const otherTripUpdate: Record<string, any> = {};
                          const otherMatched = [...(tripData.matched_trips || [])];
                          const etIndexInOther = findTripIndex(otherMatched, editedTripRef);
-                         if (etIndexInOther !== -1) {
-                             otherMatched[etIndexInOther].pickup_radius = editedTripData.pickup_radius;
-                             otherMatched[etIndexInOther].destination_radius = editedTripData.destination_radius;
-                             // Handle mutual sync if needed (n141-144) - assume it was already synced
-                             otherTripUpdate.matched_trips = otherMatched;
-                             transaction.update(tripRef, otherTripUpdate);
-                             logger.info(`Updated radii for ET in paid matched trip ${tripRef.id}'s matched_trips.`);
+                         const otherIndexInETMatched = findTripIndex(editedTripUpdate.matched_trips, tripRef);
+                         const etIndexInOtherPotential = findTripIndex(otherPotential, editedTripRef);
+                         if (tripElement.mutual) {
+                            if (etIndexInOther !== -1) {
+                                otherMatched[etIndexInOther].pickup_radius = editedTripData.pickup_radius;
+                                otherMatched[etIndexInOther].destination_radius = editedTripData.destination_radius;
+                                otherTripUpdate.matched_trips = otherMatched;
+                            } else { 
+                                logger.warn(`ET not found in paid matched trip ${tripRef.id}'s matched_trips for update.`);
+                            }
                          } else {
-                              logger.warn(`ET not found in paid matched trip ${tripRef.id}'s matched_trips for update.`);
-                         }
+                            const matchedEntryForOther: MatchedTrip = {
+                                trip_ref: editedTripRef,
+                                paid: false,
+                                trip_group_ref: null,
+                                pickup_radius: editedTripData.pickup_radius,
+                                destination_radius: editedTripData.destination_radius,
+                                pickup_distance: tripElement.pickup_distance, // Keep original distance
+                                destination_distance: tripElement.destination_distance, // Keep original distance
+                                mutual: true, // As requested
+                                reserving: false,
+                                seat_count: editedTripData.seat_count // Add if needed
+                                };
+                            otherTripUpdate.potential_trips = FieldValue.arrayRemove(otherPotential[etIndexInOtherPotential]);
+                            otherTripUpdate.matched_trips = FieldValue.arrayUnion(matchedEntryForOther); // Add to matched_trips
+                            editedTripUpdate.matched_trips[otherIndexInETMatched].mutual = true; // Set mutual to true in ET's matched entry   
+                        }
+                         transaction.update(tripRef, otherTripUpdate);
+                         logger.info(`Updated radii for ET in paid matched trip ${tripRef.id}'s matched_trips.`);
                          finalMatchedTrips.push(tripElement as MatchedTrip); // Keep in matched list
                      } else {
+                         const otherTripUpdate: Record<string, any> = {};
+                         const otherMatched = [...(tripData.matched_trips || [])];
+                         const otherPotential = [...(tripData.potential_trips || [])];
+                         const etIndexInOther = findTripIndex(otherMatched, editedTripRef);
+                         const otherIndexInETMatched = findTripIndex(editedTripUpdate.matched_trips, tripRef);
+                         const etIndexInOtherPotential = findTripIndex(otherPotential, editedTripRef);
                          // n137 -> No OR n139 -> Yes: Match Broken or Obstructed -> Move to Potential
                          logger.info(`Moving paid matched trip ${tripRef.id} to potential (match broken/obstructed).`);
                          const potentialEntry: PotentialTrip = {
@@ -1024,46 +1405,94 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                              pickup_distance: tripElement.pickup_distance,
                              destination_distance: tripElement.destination_distance,
                              proper_match: matchesGeometrically, // True if geometrically ok but obstructed
-                             trip_obstruction: isTripObstructed,
+                             trip_obstruction: isTripObstructed || matchesGeometrically,
                              seat_obstruction: isSeatObstructed,
                              reserving_trip_obstruction: isReservingObstructed,
-                             mutual: (tripElement as MatchedTrip).mutual, // Preserve mutual temporarily
+                             mutual: !matchesGeometrically || 
+                             (!tripElement.mutual && isReservingObstructed && (isTripObstructed || isSeatObstructed)),
                              group_largest_pickup_overlap_gap: tgInfo?.largestPickupOverlapGap ?? null,
                              group_largest_destination_overlap_gap: tgInfo?.largestDestinationOverlapGap ?? null,
                              unknown_trip_obstruction: false, // Assuming known obstruction reasons
                              total_seat_count: tgInfo?.tripGroupData?.total_seat_count ?? null,
-                             // seat_count: tripData.seat_count // Add if needed
+                             seat_count: tripData.seat_count // Add if needed
                          };
                          finalPotentialTrips.push(potentialEntry);
+                         if (isSeatObstructed && isTripObstructed) {
+                             customArrayUnion(editedTripUpdate.potential_trips, potentialEntry); // Use custom function to avoid duplicates
+                             editedTripUpdate.matched_trips?.splice(otherIndexInETMatched, 1); // Remove from matched_trips
+                         }
 
-                         // Update other trip: Remove ET from matched, Add ET to potential
-                         const otherTripUpdate: Record<string, any> = {};
-                         const otherPotentialEntry: PotentialTrip = { ...potentialEntry }; // Clone base info
-                         otherPotentialEntry.trip_ref = editedTripRef;
-                         otherPotentialEntry.pickup_radius = editedTripData.pickup_radius;
-                         otherPotentialEntry.destination_radius = editedTripData.destination_radius;
-                         otherPotentialEntry.total_seat_count = editedTripData.total_seat_count ?? editedTripData.seat_count;
-                         // Obstructions from other trip's perspective (usually false unless ET is reserved)
-                         otherPotentialEntry.trip_obstruction = false;
-                         otherPotentialEntry.seat_obstruction = false;
-                         otherPotentialEntry.reserving_trip_obstruction = currentlyReservedByEdit; // Is ET reserved?
-
-                         otherTripUpdate.potential_trips = FieldValue.arrayUnion(otherPotentialEntry);
-                          // Remove ET from matched - requires exact match
-                          const removalElement = (tripData.matched_trips || []).find(t => t.trip_ref.path === editedTripRef.path);
-                          if (removalElement) {
-                             otherTripUpdate.matched_trips = FieldValue.arrayRemove(removalElement);
-                             logger.info(`Attempting removal of ET from paid matched trip ${tripRef.id}'s matched trips.`);
-                          } else {
-                              logger.warn(`ET not found in paid matched trip ${tripRef.id}'s matched_trips for removal.`);
-                          }
+                         if (tripElement.mutual && matchesGeometrically) {
+                            otherMatched[etIndexInOther].pickup_radius = editedTripData.pickup_radius;
+                            otherMatched[etIndexInOther].destination_radius = editedTripData.destination_radius;
+                            otherMatched[etIndexInOther].mutual = false; // Set mutual to false in other trip's matched entry
+                            otherTripUpdate.matched_trips = otherMatched;
+                         } else if (!tripElement.mutual && matchesGeometrically) {
+                            if (isReservingObstructed) {
+                                matched = (isTripObstructed || isSeatObstructed) ? false : true; // Set mutual to false if not obstructed
+                                otherPotential[etIndexInOtherPotential].pickup_radius = editedTripData.pickup_radius;
+                                otherPotential[etIndexInOtherPotential].destination_radius = editedTripData.destination_radius;
+                                otherPotential[etIndexInOtherPotential].mutual = (isTripObstructed || isSeatObstructed) ? true : false; // Set mutual to false if not obstructed
+                            } else {
+                                const matchedEntryForOther: MatchedTrip = {
+                                    trip_ref: editedTripRef,
+                                    paid: false,
+                                    trip_group_ref: null,
+                                    pickup_radius: editedTripData.pickup_radius,
+                                    destination_radius: editedTripData.destination_radius,
+                                    pickup_distance: tripElement.pickup_distance, // Keep original distance
+                                    destination_distance: tripElement.destination_distance, // Keep original distance
+                                    mutual: false, // As requested
+                                    reserving: false,
+                                    seat_count: editedTripData.seat_count // Add if needed
+                                 };
+                                otherTripUpdate.potential_trips = FieldValue.arrayRemove(otherPotential[etIndexInOtherPotential]);
+                                otherTripUpdate.matched_trips = FieldValue.arrayUnion(matchedEntryForOther); // Add to matched_trips
+                            }
+                        } else if (!tripElement.mutual && !matchesGeometrically) {
+                            otherPotential[etIndexInOtherPotential].pickup_radius = editedTripData.pickup_radius;
+                            otherPotential[etIndexInOtherPotential].destination_radius = editedTripData.destination_radius;
+                            otherPotential[etIndexInOtherPotential].mutual = true;
+                            otherPotential[etIndexInOtherPotential].reserving_trip_obstruction = isReservingObstructed ? true : false; // Set mutual to false if not obstructed
+                            otherPotential[etIndexInOtherPotential].proper_match = false; // Set proper_match to false
+                            otherTripUpdate.potential_trips = otherPotential;
+                        } else if (tripElement.mutual && !matchesGeometrically) {
+                            const potentialEntryForOther: PotentialTrip = {
+                                trip_ref: editedTripRef,
+                                paid: false,
+                                trip_group_ref: null,
+                                pickup_radius: editedTripData.pickup_radius,
+                                destination_radius: editedTripData.destination_radius,
+                                pickup_distance: tripElement.pickup_distance, // Keep original distance
+                                destination_distance: tripElement.destination_distance, // Keep original distance
+                                proper_match: false, // Matches geometrically
+                                trip_obstruction: false,
+                                seat_obstruction: false,
+                                reserving_trip_obstruction: false,
+                                mutual: true, // Set calculated mutual status
+                                group_largest_pickup_overlap_gap: null,
+                                group_largest_destination_overlap_gap: null,
+                                unknown_trip_obstruction: false,
+                                total_seat_count: null,
+                                seat_count: editedTripData.seat_count // Add if needed
+                            };
+                            otherTripUpdate.matched_trips = FieldValue.arrayRemove(otherMatched[etIndexInOther]);
+                            otherTripUpdate.potential_trips = FieldValue.arrayUnion(potentialEntryForOther); // Add to potential_trips
+                        }
                          transaction.update(tripRef, otherTripUpdate);
                          logger.info(`Moved ET from matched to potential for paid trip ${tripRef.id}.`);
                      }
-                 } else {
-                     // --- Was Potential ---
-                     if (canBeMatched) {
-                         // n198 -> No -> n214: Promoted to Matched
+                    } else {
+                        const otherMatched = [...(tripData.matched_trips || [])];
+                        const otherPotential = [...(tripData.potential_trips || [])];
+                        const otherTripUpdate: Record<string, any> = {};
+                        const etIndexInOtherMatched = findTripIndex(otherMatched, editedTripRef);
+                        const otherIndexInETMatched = findTripIndex(editedTripUpdate.matched_trips, tripRef);
+                        const otherIndexInETPotential = findTripIndex(editedTripUpdate.potential_trips, tripRef);
+                        const etIndexInOtherPotential = findTripIndex(otherPotential, editedTripRef);
+                        // --- Was Potential ---
+                        if (canBeMatched) {
+                            // n198 -> No -> n214: Promoted to Matched
                          logger.info(`Promoting paid potential trip ${tripRef.id} to matched.`);
                          matched = true;
                          const matchedEntry: MatchedTrip = {
@@ -1074,115 +1503,137 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                              destination_radius: tripData.destination_radius,
                              pickup_distance: tripElement.pickup_distance,
                              destination_distance: tripElement.destination_distance,
-                             mutual: tripElement.mutual, // Preserve mutual
+                             mutual: true, // Preserve mutual
                              reserving: false, // ET not reserving here
-                            // seat_count: tripData.seat_count // Add if needed
-                         };
-                         finalMatchedTrips.push(matchedEntry);
-
-                         // Update other trip: Remove ET from potential, Add ET to matched
-                         const otherTripUpdate: Record<string, any> = {};
-                         const otherMatchedEntry: MatchedTrip = { ...matchedEntry }; // Clone base info
-                         otherMatchedEntry.trip_ref = editedTripRef;
-                         otherMatchedEntry.pickup_radius = editedTripData.pickup_radius;
-                         otherMatchedEntry.destination_radius = editedTripData.destination_radius;
-                         // seat_count: editedTripData.seat_count // Add if needed
-
-                         otherTripUpdate.matched_trips = FieldValue.arrayUnion(otherMatchedEntry);
-                          // Remove ET from potential - requires exact match
-                          const removalElement = (tripData.potential_trips || []).find(t => t.trip_ref.path === editedTripRef.path);
-                          if (removalElement) {
-                             otherTripUpdate.potential_trips = FieldValue.arrayRemove(removalElement);
-                             logger.info(`Attempting removal of ET from paid potential trip ${tripRef.id}'s potential trips.`);
-                          } else {
-                               logger.warn(`ET not found in paid potential trip ${tripRef.id}'s potential_trips for removal.`);
-                          }
+                             seat_count: tripData.seat_count // Add if needed
+                            };
+                            customArrayUnion(editedTripUpdate.matched_trips, matchedEntry); // Use custom function to avoid duplicates
+                            editedTripUpdate.potential_trips?.splice(otherIndexInETPotential, 1); // Remove from potential_trips
+                            finalMatchedTrips.push(matchedEntry);
+                            
+                            if (tripElement.mutual) {
+                                const matchedEntryForOther: MatchedTrip = {
+                                    trip_ref: editedTripRef,
+                                    paid: false,
+                                    trip_group_ref: null,
+                                    pickup_radius: editedTripData.pickup_radius,
+                                    destination_radius: editedTripData.destination_radius,
+                                    pickup_distance: tripElement.pickup_distance, // Keep original distance
+                                    destination_distance: tripElement.destination_distance, // Keep original distance
+                                    mutual: true, // As requested
+                                    reserving: false,
+                                    seat_count: editedTripData.seat_count // Add if needed
+                                };
+                                otherTripUpdate.potential_trips = FieldValue.arrayRemove(otherPotential[etIndexInOtherPotential]);
+                                otherTripUpdate.matched_trips = FieldValue.arrayUnion(matchedEntryForOther); // Add to matched_trips
+                            } else {
+                                if (etIndexInOtherMatched !== -1) {
+                                    otherMatched[etIndexInOtherMatched].pickup_radius = editedTripData.pickup_radius;
+                                    otherMatched[etIndexInOtherMatched].destination_radius = editedTripData.destination_radius;
+                                    otherMatched[etIndexInOtherMatched].mutual = true; // Set mutual to false in other trip's matched entry
+                                    otherTripUpdate.matched_trips = otherMatched;
+                                } else {
+                                    logger.warn(`ET not found in paid matched trip ${tripRef.id}'s matched_trips for update.`);
+                                }
+                            }
                          transaction.update(tripRef, otherTripUpdate);
                          logger.info(`Moved ET from potential to matched for paid trip ${tripRef.id}.`);
-
                      } else {
                          // n188 -> No OR n198 -> Yes: Stays Potential, update details
                          logger.info(`Paid potential trip ${tripRef.id} remains potential (or cannot be matched). Updating details.`);
-                         const potentialEntry: PotentialTrip = {
-                             trip_ref: tripRef,
-                             paid: true,
-                             trip_group_ref: tgRef,
-                             pickup_radius: tripData.pickup_radius,
-                             destination_radius: tripData.destination_radius,
-                             pickup_distance: distanceBetween(editedTripData.pickup_latlng, tripData.pickup_latlng), // Recalculate distance
-                             destination_distance: distanceBetween(editedTripData.destination_latlng, tripData.destination_latlng), // Recalculate distance
-                             proper_match: matchesGeometrically,
-                             trip_obstruction: isTripObstructed,
-                             seat_obstruction: isSeatObstructed,
-                             reserving_trip_obstruction: isReservingObstructed,
-                             mutual: tripElement.mutual, // Preserve mutual
-                             group_largest_pickup_overlap_gap: tgInfo?.largestPickupOverlapGap ?? null,
-                             group_largest_destination_overlap_gap: tgInfo?.largestDestinationOverlapGap ?? null,
-                             unknown_trip_obstruction: false,
-                             total_seat_count: tgInfo?.tripGroupData?.total_seat_count ?? null,
-                             // seat_count: tripData.seat_count // Add if needed
-                         };
-                         finalPotentialTrips.push(potentialEntry);
-
-                         // Update other trip's potential entry for ET
-                         const otherTripUpdate: Record<string, any> = {};
-                         const otherPotential = [...(tripData.potential_trips || [])];
-                         const etIndexInOther = findTripIndex(otherPotential, editedTripRef);
-                         if (etIndexInOther !== -1) {
-                            otherPotential[etIndexInOther].proper_match = matchesGeometrically;
-                            otherPotential[etIndexInOther].pickup_radius = editedTripData.pickup_radius;
-                            otherPotential[etIndexInOther].destination_radius = editedTripData.destination_radius;
-                            otherPotential[etIndexInOther].pickup_distance = potentialEntry.pickup_distance; // Use consistent distance
-                            otherPotential[etIndexInOther].destination_distance = potentialEntry.destination_distance; // Use consistent distance
-                            otherPotential[etIndexInOther].trip_obstruction = false; // From other trip's perspective
-                            otherPotential[etIndexInOther].seat_obstruction = false; // From other trip's perspective
-                            otherPotential[etIndexInOther].reserving_trip_obstruction = currentlyReservedByEdit;
-                            otherPotential[etIndexInOther].group_largest_pickup_overlap_gap = null; // N/A for direct potential
-                            otherPotential[etIndexInOther].group_largest_destination_overlap_gap = null; // N/A for direct potential
-
-                            otherTripUpdate.potential_trips = otherPotential; // Overwrite array
-                             transaction.update(tripRef, otherTripUpdate);
-                             logger.info(`Updated potential entry for ET in paid potential trip ${tripRef.id}.`);
-                         } else {
-                             logger.warn(`ET not found in paid potential trip ${tripRef.id}'s potential_trips for update.`);
-                             // It might have been in matched before, need to handle removal + adding to potential (n196)
-                              const removalElementMatched = (tripData.matched_trips || []).find(t => t.trip_ref.path === editedTripRef.path);
-                              if(removalElementMatched) {
-                                  const otherPotentialEntry: PotentialTrip = {
-                                       trip_ref: editedTripRef,
-                                       paid: false, // ET not paid in this context
-                                       trip_group_ref: null,
-                                       pickup_radius: editedTripData.pickup_radius,
-                                       destination_radius: editedTripData.destination_radius,
-                                       pickup_distance: potentialEntry.pickup_distance,
-                                       destination_distance: potentialEntry.destination_distance,
-                                       proper_match: matchesGeometrically,
-                                       trip_obstruction: false,
-                                       seat_obstruction: false,
-                                       reserving_trip_obstruction: currentlyReservedByEdit,
-                                       mutual: removalElementMatched.mutual, // Keep original mutual
-                                       group_largest_pickup_overlap_gap: null,
-                                       group_largest_destination_overlap_gap: null,
-                                       unknown_trip_obstruction: false,
-                                       total_seat_count: null,
-                                  };
-                                  otherTripUpdate.potential_trips = FieldValue.arrayUnion(otherPotentialEntry);
-                                  otherTripUpdate.matched_trips = FieldValue.arrayRemove(removalElementMatched);
-                                  transaction.update(tripRef, otherTripUpdate);
-                                  logger.info(`Moved ET from matched to potential for paid trip ${tripRef.id} (was potential for ET).`);
-                              }
+                         
+                         if (isTripObstructed && isSeatObstructed) {
+                             editedTripUpdate.potential_trips[otherIndexInETPotential].proper_match = matchesGeometrically; // Update proper_match
+                             editedTripUpdate.potential_trips[otherIndexInETPotential].trip_obstruction = isTripObstructed; // Update trip_obstruction
+                             editedTripUpdate.potential_trips[otherIndexInETPotential].seat_obstruction = isSeatObstructed; // Update seat_obstruction
+                             editedTripUpdate.potential_trips[otherIndexInETPotential].mutual = !matchesGeometrically || (tripElement.mutual && isReservingObstructed);; // Update reserving_trip_obstruction
+                             editedTripUpdate.potential_trips[otherIndexInETPotential].group_largest_destination_overlap_gap = tgInfo?.largestDestinationOverlapGap ?? null; // Update largest gap
+                             editedTripUpdate.potential_trips[otherIndexInETPotential].group_largest_pickup_overlap_gap = tgInfo?.largestPickupOverlapGap ?? null; // Update largest gap
                          }
+
+                         if (matchesGeometrically && tripElement.mutual) {
+                            if (isReservingObstructed) {
+                                if (!isTripObstructed && !isSeatObstructed) {
+                                    matched = true;
+                                    const matchedEntry: MatchedTrip = {
+                                        trip_ref: tripRef,
+                                        paid: true,
+                                        trip_group_ref: tgRef,
+                                        pickup_radius: tripData.pickup_radius,
+                                        destination_radius: tripData.destination_radius,
+                                        pickup_distance: tripElement.pickup_distance,
+                                        destination_distance: tripElement.destination_distance,
+                                        mutual: false, // Preserve mutual
+                                        reserving: false, // ET not reserving here
+                                        seat_count: tripData.seat_count // Add if needed
+                                       };
+                                       customArrayUnion(editedTripUpdate.matched_trips, matchedEntry); // Use custom function to avoid duplicates
+                                       editedTripUpdate.potential_trips?.splice(otherIndexInETPotential, 1); // Remove from potential_trips           
+                                    otherPotential[etIndexInOtherPotential].pickup_radius = editedTripData.pickup_radius;
+                                    otherPotential[etIndexInOtherPotential].destination_radius = editedTripData.destination_radius;
+                                    otherPotential[etIndexInOtherPotential].mutual = false; // Set mutual to false if not obstructed
+                                } else {
+                                    otherPotential[etIndexInOtherPotential].pickup_radius = editedTripData.pickup_radius;
+                                    otherPotential[etIndexInOtherPotential].destination_radius = editedTripData.destination_radius;
+                                    editedTripUpdate.potential_trips[otherIndexInETPotential].trip_obstruction = tgInfo?.tripObstruction ?? false; // Set trip obstruction to true
+                                    editedTripUpdate.potential_trips[otherIndexInETPotential].proper_match = true; // Set proper_match to true
+                                }
+                            } else {
+                                const matchedEntryForOther: MatchedTrip = {
+                                    trip_ref: editedTripRef,
+                                    paid: false,
+                                    trip_group_ref: null,
+                                    pickup_radius: editedTripData.pickup_radius,
+                                    destination_radius: editedTripData.destination_radius,
+                                    pickup_distance: tripElement.pickup_distance, // Keep original distance
+                                    destination_distance: tripElement.destination_distance, // Keep original distance
+                                    mutual: false, // As requested
+                                    reserving: false,
+                                    seat_count: editedTripData.seat_count // Add if needed
+                                 };
+                                otherTripUpdate.potential_trips = FieldValue.arrayRemove(otherPotential[etIndexInOtherPotential]);
+                                otherTripUpdate.matched_trips = FieldValue.arrayUnion(matchedEntryForOther); // Add to matched_trips
+                            }
+                        } else if (matchesGeometrically && !tripElement.mutual) {
+                            otherMatched[etIndexInOtherMatched].pickup_radius = editedTripData.pickup_radius;
+                            otherMatched[etIndexInOtherMatched].destination_radius = editedTripData.destination_radius;
+                            otherTripUpdate.matched_trips = otherMatched;
+                        } else if (!matchesGeometrically && tripElement.mutual) {
+                            otherPotential[etIndexInOtherPotential].pickup_radius = editedTripData.pickup_radius;
+                            otherPotential[etIndexInOtherPotential].destination_radius = editedTripData.destination_radius;
+                            otherPotential[etIndexInOtherPotential].reserving_trip_obstruction = isReservingObstructed ? true : false; // Set mutual to false if not obstructed
+                            otherPotential[etIndexInOtherPotential].proper_match = false; // Set proper_match to false
+                            otherTripUpdate.potential_trips = otherPotential;
+                        } else if (!matchesGeometrically && !tripElement.mutual) {
+                            const potentialEntryForOther: PotentialTrip = {
+                                trip_ref: editedTripRef,
+                                paid: false,
+                                trip_group_ref: null,
+                                pickup_radius: editedTripData.pickup_radius,
+                                destination_radius: editedTripData.destination_radius,
+                                pickup_distance: tripElement.pickup_distance, // Keep original distance
+                                destination_distance: tripElement.destination_distance, // Keep original distance
+                                proper_match: false, // Matches geometrically
+                                trip_obstruction: false,
+                                seat_obstruction: false,
+                                reserving_trip_obstruction: false,
+                                mutual: true, // Set calculated mutual status
+                                group_largest_pickup_overlap_gap: null,
+                                group_largest_destination_overlap_gap: null,
+                                unknown_trip_obstruction: false,
+                                total_seat_count: null,
+                                seat_count: editedTripData.seat_count // Add if needed
+                            };
+                            otherTripUpdate.matched_trips = FieldValue.arrayRemove(otherMatched[etIndexInOtherMatched]);
+                            otherTripUpdate.potential_trips = FieldValue.arrayUnion(potentialEntryForOther); // Add to potential_trips
+                        }
                      }
                  }
             } // End loop through paid trips
 
-            // --- Final Updates to Edited Trip ---
-            editedTripUpdate.matched_trips = finalMatchedTrips;
-            editedTripUpdate.potential_trips = finalPotentialTrips;
-
             // n222: Final Status Check
             const currentStatus = editedTripData.status;
-            const hasMatchesNow = finalMatchedTrips.length > 0;
+            const hasMatchesNow = editedTripUpdate.matched_trips.length > 0;
 
             // n221/n223/n224/n225: Update Status
             if (hasMatchesNow && currentStatus === "unmatched") {
@@ -1194,7 +1645,7 @@ export const tripEdited = onDocumentUpdated("users/{userId}/trips/{tripId}", asy
                  // Also clear reservation if it becomes unmatched
                  if (editedTripUpdate.reserved === undefined && editedTripData.reserved) {
                      editedTripUpdate.reserved = false;
-                     editedTripUpdate.reserving_trip_ref = FieldValue.delete();
+                     editedTripUpdate.reserving_trip_ref = FieldValue.delete() as any;
                      logger.info(`Clearing reservation on ET ${editedTripRef.id} as it became unmatched.`);
                  }
             } else {

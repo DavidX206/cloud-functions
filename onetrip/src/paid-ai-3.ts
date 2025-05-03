@@ -4,6 +4,7 @@ import { Trip, User, TripGroup, MatchedTrip, PotentialTrip, Message, LatLng, Tri
 import { HttpsError } from "firebase-functions/v2/https";
 import * as logger from "firebase-functions/logger";
 import { updateNestedTripField, properMatchArrayCheck, getStoredDistances, calculateGap, checkAnyMemberUnknownToTrip } from './utils/utils'; // Import helper functions
+import { db } from "./firebaseAdmin";
 
 //Assuming the use of these APIs
 interface MapsNearbySearchResult {
@@ -44,7 +45,6 @@ export const tripPaid = onDocumentUpdated("users/{userId}/trips/{tripId}", async
     
     //NPT is the New Paid Trip
     const nptTripRef = event.data.after.ref; 
-    const db = getFirestore();
 
     await db.runTransaction(async (transaction: Transaction) => {
 

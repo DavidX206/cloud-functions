@@ -4,7 +4,6 @@ import * as serviceAccount from '../service-account/starlit-cycle-403120-firebas
 // import { describe } from 'node:test';
 import * as usersData from '../mock/users.json';
 import * as tripsData from '../mock/trips.json';
-import {customArrayUnion} from './src/utils/utils';
 
 // Type definitions
 interface LatLng {
@@ -147,7 +146,7 @@ const trip: Trip = {
 };
 
 const mt: MatchedTrip = {
-  trip_ref: db.collection('trips').doc("trip_031"),
+  trip_ref: db.collection('trips').doc("trip31"),
   paid: false,
   trip_group_ref: db.collection('trip_groups').doc("group_031"),
   pickup_radius: 2500,
@@ -155,31 +154,11 @@ const mt: MatchedTrip = {
   pickup_distance: 0,
   destination_distance: 0,
   proper_match: true,
-  seat_count: 1,
-}
-
-const pt: PotentialTrip = {
-  trip_ref: db.collection('trips').doc("trip_031"),
-  paid: false,
-  trip_group_ref: db.collection('trip_groups').doc("group_031"),
-  pickup_radius: 2500,
-  destination_radius: 2000,
-  pickup_distance: 0,
-  destination_distance: 0,
-  proper_match: true,
-  trip_obstruction: false,
-  seat_obstruction: false,
-  reserving_trip_obstruction: false,
-  mutual: true,
-  group_largest_pickup_overlap_gap: null,
-  group_largest_destination_overlap_gap: null,
-  unknown_trip_obstruction: false,
-  total_seat_count: null,
   seat_count: 1,
 }
 
 const mt1: MatchedTrip = {
-  trip_ref: db.collection('trips').doc("trip_029"),
+  trip_ref: db.collection('trips').doc("trip29"),
   paid: false,
   trip_group_ref: "",
   pickup_radius: 2500,
@@ -191,7 +170,7 @@ const mt1: MatchedTrip = {
 }
 
 const mt2: MatchedTrip = {
-  trip_ref: db.collection('trips').doc("trip_010"),
+  trip_ref: db.collection('trips').doc("trip10"),
   paid: false,
   trip_group_ref: "",
   pickup_radius: 2500,
@@ -203,7 +182,7 @@ const mt2: MatchedTrip = {
 }
 
 const m3: MatchedTrip = {
-  trip_ref: db.collection('trips').doc("trip_018"),
+  trip_ref: db.collection('trips').doc("trip18"),
   paid: false,
   trip_group_ref: "",
   pickup_radius: 2500,
@@ -348,40 +327,64 @@ function removeArrayElementById(
   updateObj[arrayField] = FieldValue.arrayRemove(element);
 }
 
+const reservingTripUpdate: Partial<Trip> = {};
 
 const reservingTripRef = db
-.collection(`users/uid1/trips`)
-.doc("trip1");
+  .collection(`users/uid1/trips`)
+  .doc("trip1");
 
 
-
-(async () => {
-  await addUsersToCollection();
-  await assignTripsToUsers();
-  // Example of how to use the updateNestedTripField function
-  const reservingTripUpdate: Partial<Trip> = {
-    total_seat_count: 10,
-  };
-  reservingTripUpdate.matched_trips = [] as MatchedTrip[];
-
-  customArrayUnion(reservingTripUpdate.matched_trips, mt);
-  customArrayUnion(reservingTripUpdate.matched_trips, pt);
-  // reservingTripUpdate.matched_trips.forEach((trip: MatchedTrip, index: number) => {
-  //   if (trip === mt1) {
-  //     reservingTripUpdate.matched_trips = reservingTripUpdate.matched_trips?.filter(mt => mt.trip_ref?.path !== mt1.trip_ref.path);
-  //   } 
-  // });
-  reservingTripUpdate.matched_trips = FieldValue.arrayUnion(mt, mt1, mt2, m3) as any;
-  reservingTripUpdate.total_seat_count = FieldValue.delete() as any;
-  // await updateNestedTripField(reservingTripUpdate, 'matched_trips', 0, 'seat_count', 10);
-  // await updateNestedTripField(reservingTripUpdate, 'matched_trips', 0, 'paid', true);
-  // await updateNestedTripField(reservingTripUpdate, 'matched_trips', 0, 'reserving', false);
   
-    // reservingTripUpdate.matched_trips[0].seat_count = 10;
-    // reservingTripUpdate.matched_trips[0].paid = true;
-    // reservingTripUpdate.matched_trips[0].reserving = false;
-  console.log(reservingTripUpdate);
+  const tripRef =  db
+  .collection(`users/uid1/trips`)
+  .doc("trip1");;
+  let readCount = 0;
+  let writeCount = 0;
+  
+  // Test 1: Multiple transaction.update calls
+  async function testMultipleUpdates() {
+    await db.runTransaction(async (transaction) => {
+      readCount++
+      const doc = await transaction.get(tripRef); // 1 read
+      const nestedUpdates: Partial<Trip> = {};
+      // First update: arrayUnion
+      console.log('Applying arrayUnion with mt:', mt);
+      nestedUpdates.matched_trips?.push(mt)
 
-  await reservingTripRef.update(reservingTripUpdate);
-  console.log("Updated reserving trip successfully.");
-})();
+      // Second update: nested fields
+      console.log('Applying nested updates...');
+      updateNestedTripField(nestedUpdates, 'matched_trips', 0, 'seat_count', 10);
+      updateNestedTripField(nestedUpdates, 'matched_trips', 0, 'paid', true);
+      // transaction.update(tripRef, nestedUpdates);
+      writeCount++
+    });
+    console.log('Multiple updates transaction completed');
+    console.log(`Reads: ${readCount}, Writes: ${writeCount}`);
+    const finalDoc = await tripRef.get();
+  console.log('Final document:', finalDoc.exists ? finalDoc.data() : 'Not found');
+  }
+  
+  // Test 2: Single transaction.update call (without arrayUnion for simplicity)
+  async function testSingleUpdate() {
+    await db.runTransaction(async (transaction) => {
+        readCount++
+      const doc = await transaction.get(tripRef); // 1 read
+      transaction.update(tripRef, {
+        'matched_trips.0.seat_count': 10,
+        'matched_trips.0.paid': true,
+        'matched_trips.0.reserving': false,
+      });
+        writeCount++
+    });
+    console.log('Single update transaction completed');
+  }
+  
+  // Run tests
+  async function runTests() {
+    // await addUsersToCollection();
+    // await assignTripsToUsers();
+    await testMultipleUpdates();
+    // await testSingleUpdate();
+  }
+  
+  runTests().catch(console.error);

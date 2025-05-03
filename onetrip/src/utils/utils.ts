@@ -1,6 +1,7 @@
-import {ArrayFieldToDetails, Trip, PotentialTrip, MatchedTrip, TripGroupMember} from '../../../type';
+import {ArrayFieldToDetails, Trip, PotentialTrip, MatchedTrip, TripGroupMember, PickupLocationSuggestion, DestinationSuggestion} from '../../../type';
 import * as logger from "firebase-functions/logger";
 import { DocumentReference, Transaction } from 'firebase-admin/firestore';
+import axios from 'axios';
 
 
 
@@ -262,3 +263,114 @@ export function getStoredDistances(
     // in either matched or potential for the potentialTrip.
     return false;
   }
+
+  export async function checkMemberUnknownToTrip(
+    potentialTrip: Trip,
+    tripGroupMember: Trip,
+  ): Promise<boolean> {
+    // if (!potentialTripRef) {
+    //   logger.error("checkMemberUnknownToTrip: potentialTripRef is required.");
+    //   return true; // Treat as unknown if the reference itself is missing
+    // }
+    // if (!tripGroupMember || !tripGroupMember.trip_ref) {
+    //   logger.warn("checkMemberUnknownToTrip: Invalid group member data.");
+    //   return true; // Treat as unknown if the member data is invalid
+    // }
+  
+    const memberTripId = tripGroupMember.trip_id;
+  
+    // // Don't check a trip against itself
+    // if (potentialTripRef.id === memberTripId) {
+    //   return false; // Not unknown to itself
+    // }
+  
+    // let potentialTrip: Trip | null = null;
+  
+    // try {
+    //   // Fetch the potentialTrip's document first
+    //   const potentialTripDoc = await transaction.get(potentialTripRef);
+    //   if (!potentialTripDoc.exists) {
+    //     logger.warn(`checkMemberUnknownToTrip: Potential trip document ${potentialTripRef.id} not found.`);
+    //     return true; // Treat as unknown if the potential trip doesn't exist
+    //   }
+    //   potentialTrip = potentialTripDoc.data() as Trip;
+  
+    // } catch (error) {
+    //   logger.error(`checkMemberUnknownToTrip: Error fetching potential trip ${potentialTripRef.id}`, error);
+    //   return true; // Assume unknown members for safety
+    // }
+  
+    // Check if memberTripId is in potentialTrip's matched_trips or potential_trips
+    const isInMatched = potentialTrip.matched_trips?.some(
+      (mt) => mt.trip_ref?.id === memberTripId
+    ) ?? false;
+  
+    const isInPotential = potentialTrip.potential_trips?.some(
+      (pt) => pt.trip_ref?.id === memberTripId
+    ) ?? false;
+  
+    // If this member is NOT in EITHER array of the potentialTrip, then return true
+    if (!isInMatched && !isInPotential) {
+      logger.info(`checkMemberUnknownToTrip: Member ${memberTripId} is unknown to potential trip ${potentialTripRef.id}.`);
+      return true; // Found an unknown member, no need to check further
+    }
+  
+    // If the loop completes without returning true, all members were found in either matched or potential for the potentialTrip.
+    return false;
+  }
+
+
+export const getDistanceMatrix = async (origins: string, destinations: string) => {
+    const apiKey = process.env.RADAR_API_KEY;
+    const url = `https://api.radar.io/v1/route/matrix?origins=${origins}&destinations=${destinations}`;
+
+    try {
+        const response = await axios.get(url, {
+            headers: {
+                Authorization: `Bearer ${apiKey}`,
+            },
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Error calling Radar Route Matrix API:", error);
+        throw new Error("Failed to retrieve route matrix");
+    }
+};
+
+export function findTripIndex(tripsArray: (MatchedTrip | PotentialTrip)[], targetTripRef: DocumentReference): number {
+  if (!tripsArray || !targetTripRef) return -1;
+  return tripsArray.findIndex(t => t.trip_ref?.path === targetTripRef.path);
+}
+
+
+export function customArrayUnion<T>(
+  array: T[],
+  element: T,
+): T[] {
+  // Check if the element is a duplicate
+  const isDuplicate = array.some((existingElement) => deepEqual(existingElement, element));
+
+  // Append the element in place if not a duplicate
+  if (!isDuplicate) {
+    array.push(element);
+  }
+
+  // Return the updated array
+  return array;
+}
+
+// Utility function for deep equality comparison
+function deepEqual(a: any, b: any): boolean {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (typeof a !== 'object' || typeof b !== 'object') return false;
+
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+
+  for (const key of keysA) {
+    if (!keysB.includes(key) || !deepEqual(a[key], b[key])) return false;
+  }
+  return true;
+}

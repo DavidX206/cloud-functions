@@ -15,8 +15,8 @@ for prefix, uri in namespaces.items():
     ET.register_namespace(prefix, uri)
 
 # Input and output file paths
-input_file = 'edited.graphml'  # Replace with your GraphML file path
-output_file = 'simplified_edited.graphml'  # Where the simplified file will be saved
+input_file = 'posted.graphml'  # Replace with your GraphML file path
+output_file = 'simplified_posted.graphml'  # Where the simplified file will be saved
 
 # Function to strip HTML-like tags and clean text
 def clean_text(text):

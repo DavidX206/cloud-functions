@@ -1,11 +1,9 @@
-/* eslint-disable linebreak-style */
-const add = require("./add");
-const canceled = require("./canceled");
-const edit = require("./edit");
-const paid = require("./paid");
+import { tripAdded } from "./add";
+import { tripCanceled } from "./canceled";
+import { tripEdited } from "./edit-temp";
+import { tripPaid } from "./paid-ai-3";
 
-
-exports.add = add.tripAddedFunction;
-exports.canceled = canceled.tripCanceledFunction;
-exports.edit = edit.tripEditedFunction;
-exports.paid = paid.tripPaidFunction;
+export const add = tripAdded;
+export const canceled = tripCanceled;
+export const edit = tripEdited;
+export const paid = tripPaid;

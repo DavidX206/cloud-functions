@@ -113,10 +113,10 @@ exports.tripAddedFunction = onDocumentCreated("users/{userId}/trips/{tripId}",
         };
 
         const isProperMatchWithTripGroupMembers = async (oldTripGroupData: TripGroup, tripData: Trip): Promise<boolean> => {
-            const groupMembers = oldTripGroupData.trip_group_members.map((member) => ({trip_id: member.trip_id, user_id: member.user_id}));
+            const groupMembers = oldTripGroupData.trip_group_members.map((member) => ({trip_ref: member.trip_ref, user_id: member.user_ref}));
 
             for (const member of groupMembers) {
-                const mtIndex = matchedTrips.findIndex((mt) => mt.trip_id === member.trip_id);
+                const mtIndex = matchedTrips.findIndex((mt) => mt.trip_id === member.trip_ref.id);
                 const mt = mtIndex !== -1 ? matchedTrips[mtIndex] : null;
                 
                 const pD = mt ? pickupDistance[mtIndex] : null;
@@ -124,7 +124,7 @@ exports.tripAddedFunction = onDocumentCreated("users/{userId}/trips/{tripId}",
             
                 const tripDoc = await db
                   .collection(`users/${member.user_id}/trips`)
-                  .doc(member.trip_id)
+                  .doc(member.trip_ref.id)
                   .get();
             
                 const trip = tripDoc.data() as Trip;
@@ -229,6 +229,12 @@ exports.tripAddedFunction = onDocumentCreated("users/{userId}/trips/{tripId}",
             }
         };
 
+        const checkTimeObstruction = (trip1: Trip, trip2: Trip): boolean => {
+            if (trip1.start_date_time === trip2.start_date_time) {
+                return true;
+            } else return false;
+        }
+
         const calculateOverlapGap = (oldTripGroupData: TripGroup): [number, number] => {
             const obstructingTripMembers: ObstructingTripMember[] = [];
             const pickupOverlapGaps = [];
@@ -330,49 +336,46 @@ exports.tripAddedFunction = onDocumentCreated("users/{userId}/trips/{tripId}",
                   .collection(`users/${otherUserId}/trips`);
               const queries = [];
 
-              if (newTripData.is_time_fixed === false) {
-                queries.push(tripsRef
-                    .where("pickup_city", "==", newTripData.pickup_city)
-                    .where("destination_city", "==",
-                        newTripData.destination_city)
-                    .where("is_time_fixed", "==", false)
-                    .where("time_range_array", "array-contains-any",
-                        newTripData.time_range_array)
-                    .where("fully_matched", "==", false));
-              }
+            queries.push(tripsRef
+                .where("pickup_city", "==", newTripData.pickup_city)
+                .where("destination_city", "==",
+                    newTripData.destination_city)
+                .where("time_range_array", "array-contains-any",
+                    newTripData.time_range_array)
+                .where("fully_matched", "==", false));
 
-              if (newTripData.is_time_fixed === true) {
-                queries.push(tripsRef
-                    .where("pickup_city", "==", newTripData.pickup_city)
-                    .where("destination_city", "==",
-                        newTripData.destination_city)
-                    .where("is_time_fixed", "==", false)
-                    .where("time_range_array", "array-contains",
-                        newTripData.start_date_string)
-                    .where("fully_matched", "==", false));
-              }
+            //   if (newTripData.is_time_fixed === true) {
+            //     queries.push(tripsRef
+            //         .where("pickup_city", "==", newTripData.pickup_city)
+            //         .where("destination_city", "==",
+            //             newTripData.destination_city)
+            //         .where("is_time_fixed", "==", false)
+            //         .where("time_range_array", "array-contains",
+            //             newTripData.start_date_time)
+            //         .where("fully_matched", "==", false));
+            //   }
 
-              if (newTripData.is_time_fixed === false) {
-                queries.push(tripsRef
-                    .where("pickup_city", "==", newTripData.pickup_city)
-                    .where("destination_city", "==",
-                        newTripData.destination_city)
-                    .where("is_time_fixed", "==", true)
-                    .where("start_date_string", "in",
-                        newTripData.time_range_array)
-                    .where("fully_matched", "==", false));
-              }
+            //   if (newTripData.is_time_fixed === false) {
+            //     queries.push(tripsRef
+            //         .where("pickup_city", "==", newTripData.pickup_city)
+            //         .where("destination_city", "==",
+            //             newTripData.destination_city)
+            //         .where("is_time_fixed", "==", true)
+            //         .where("start_date_string", "in",
+            //             newTripData.time_range_array)
+            //         .where("fully_matched", "==", false));
+            //   }
 
-              if (newTripData.is_time_fixed === true) {
-                queries.push(tripsRef
-                    .where("pickup_city", "==", newTripData.pickup_city)
-                    .where("destination_city", "==",
-                        newTripData.destination_city)
-                    .where("is_time_fixed", "==", true)
-                    .where("start_date_string", "==",
-                        newTripData.start_date_string)
-                    .where("fully_matched", "==", false));
-              }
+            //   if (newTripData.is_time_fixed === true) {
+            //     queries.push(tripsRef
+            //         .where("pickup_city", "==", newTripData.pickup_city)
+            //         .where("destination_city", "==",
+            //             newTripData.destination_city)
+            //         .where("is_time_fixed", "==", true)
+            //         .where("start_date_string", "==",
+            //             newTripData.start_date_string)
+            //         .where("fully_matched", "==", false));
+            //   }
               // Execute the queries
               const snapshots = await Promise
                   .all(queries.map((query) => query.get()));
@@ -635,7 +638,7 @@ exports.tripAddedFunction = onDocumentCreated("users/{userId}/trips/{tripId}",
                             const oldTripGroupData = oldTripGroupDoc.data() as TripGroup;
                             if (isProperMatch(trip, newTripData, pickupDistance[index].distance, destinationDistance[index].distance) &&
                                 await isProperMatchWithTripGroupMembers(oldTripGroupData, newTripData) &&
-                                checkRemaningSeats(oldTripGroupData, newTripData)) {
+                                checkRemaningSeats(oldTripGroupData, newTripData) && checkTimeObstruction(trip, newTripData)) {
                                 if (await checkOldTripGroupPotentialTrips(oldTripGroupData, oldTripGroupDocRef)) {
                                     await updateOldTripMatchedTrips(transaction, tripRef, potentialNewTrip, {paid: false, reserving: false, mutual: false});
 

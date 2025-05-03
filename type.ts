@@ -210,9 +210,14 @@ interface Message {
 interface TripGroupInfo{
   tripGroupId: string,
   tripObstruction: boolean,
-  seatObstruction: boolean,
-  largestPickupOverlapGap: number | null,
-  largestDestinationOverlapGap: number | null,
+  seatObstruction: boolean | undefined,
+  largestPickupOverlapGap: number,
+  largestDestinationOverlapGap: number,
+  initialTripObstruction: boolean,
+  initialSeatObstruction: boolean,
+  potentialTripMemberEntry: PotentialTripMember | undefined,
+  tripGroupData: TripGroup
+
 }
 
 type ArrayFieldToDetails = {
